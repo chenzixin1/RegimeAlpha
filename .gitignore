@@ -1,0 +1,9 @@
+.DS_Store
+node_modules/
+.env
+.env.*
+tmp/
+test-results/
+.cache/
+.next/
+out/

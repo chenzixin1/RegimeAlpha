@@ -1,0 +1,25 @@
+{
+  "name": "regime-alpha",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "npm run update:data && next build",
+    "deploy:cloudflare": "npm run build && wrangler pages deploy out --project-name regimealpha --branch main",
+    "start": "next start",
+    "update:data": "node scripts/build-regimes.mjs",
+    "update:data:refresh": "REGIME_REFRESH=1 node scripts/build-regimes.mjs"
+  },
+  "dependencies": {
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest"
+  },
+  "devDependencies": {
+    "wrangler": "^4.90.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
