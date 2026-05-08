@@ -23,6 +23,65 @@ const FAMILY_LABELS = {
   special: "特殊"
 };
 
+const METRIC_EXPLANATIONS = {
+  Week: {
+    title: "周结束日",
+    body: "这一条 regime 记录对应的交易周结束日期，通常是该周最后一个有行情数据的交易日。"
+  },
+  "SPY 13W": {
+    title: "SPY 近 13 周收益",
+    body: "以 SPY 作为美股大盘代理，计算最近约一个季度的累计价格收益，用来判断市场中期方向。"
+  },
+  VIX: {
+    title: "VIX 恐慌指数",
+    body: "CBOE VIX 指数，反映标普 500 期权隐含波动率。数值越高，市场定价的波动和风险溢价通常越高。"
+  },
+  Confidence: {
+    title: "模型置信度",
+    body: "规则分类器对当前 regime 标签的相对把握程度。越高表示当前指标组合越集中地支持这个标签。"
+  },
+  "1W": {
+    title: "近 1 周收益",
+    body: "从上一周收盘到本周收盘的价格收益率，用来观察最新一周的方向冲击。"
+  },
+  "4W": {
+    title: "近 4 周收益",
+    body: "最近约一个月的累计价格收益，辅助判断短期趋势是否延续或反转。"
+  },
+  "13W": {
+    title: "近 13 周收益",
+    body: "最近约一个季度的累计价格收益，是判断中期牛熊、趋势和相对强弱的核心输入。"
+  },
+  "20D Vol": {
+    title: "20 日实现波动率",
+    body: "用过去 20 个交易日的日收益波动估算并年化，表示近期实际走出来的价格波动强度。"
+  },
+  Corr: {
+    title: "行业相关性",
+    body: "市场层面的行业 ETF 相关性指标。数值越高，说明板块更同步，分散化和选股空间通常更弱。"
+  },
+  "Eq/Bond": {
+    title: "股债相关性",
+    body: "SPY 与 TLT 的近 63 个交易日滚动相关。转正时，传统股债分散保护可能变弱。"
+  },
+  "DD 52W": {
+    title: "52 周回撤",
+    body: "当前价格相对过去 52 周高点的跌幅，用来衡量中期下行压力和修复距离。"
+  },
+  "Rel SPY": {
+    title: "相对 SPY 13 周收益",
+    body: "该资产近 13 周收益减去 SPY 近 13 周收益。正值表示跑赢大盘，负值表示跑输。"
+  },
+  "Corr SPY": {
+    title: "与 SPY 相关性",
+    body: "该资产与 SPY 的近 63 个交易日滚动相关。接近 1 表示同涨同跌更明显，接近 0 或负值表示独立性更强。"
+  },
+  Market: {
+    title: "市场 Regime",
+    body: "同一周 SPY 市场层面的 regime 标签，用来对比当前资产与整体市场环境是否一致。"
+  }
+};
+
 const REGIME_EXPLAINERS = {
   bull_quiet: {
     signal: "13 周收益为正，VIX 和 20D 实现波动偏低，行业相关性下降。",
@@ -697,10 +756,18 @@ function RegimeMark({ code }) {
 }
 
 function Metric({ label, value, tone: metricTone }) {
+  const explanation = METRIC_EXPLANATIONS[label];
   return (
-    <div className={`metric ${metricTone || ""}`}>
+    <div className={`metric ${metricTone || ""}`} tabIndex={explanation ? 0 : undefined}>
       <span>{label}</span>
       <strong>{value ?? "-"}</strong>
+      {explanation ? (
+        <span className="metric-tooltip" role="tooltip">
+          <b>{explanation.title}</b>
+          <em>{label}</em>
+          <span>{explanation.body}</span>
+        </span>
+      ) : null}
     </div>
   );
 }

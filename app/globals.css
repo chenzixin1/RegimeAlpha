@@ -156,6 +156,7 @@ h1 {
   border-radius: 6px;
   min-width: 0;
   padding: 14px;
+  position: relative;
 }
 
 .metric span {
@@ -171,6 +172,78 @@ h1 {
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   font-size: clamp(1rem, 1.6vw, 1.45rem);
   overflow-wrap: anywhere;
+}
+
+.metric[tabindex="0"] {
+  cursor: help;
+}
+
+.metric[tabindex="0"]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--ink) 72%, var(--paper));
+  outline-offset: 2px;
+}
+
+.metric-tooltip {
+  background: #161a1d;
+  border: 1px solid #2f3532;
+  border-radius: 7px;
+  box-shadow: 0 18px 40px rgba(22, 26, 29, 0.22);
+  color: #f7faf4;
+  display: grid;
+  gap: 5px;
+  inline-size: min(300px, calc(100vw - 48px));
+  left: 12px;
+  margin-bottom: 0;
+  opacity: 0;
+  padding: 11px 12px;
+  pointer-events: none;
+  position: absolute;
+  text-transform: none;
+  top: calc(100% + 8px);
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+  visibility: hidden;
+  z-index: 60;
+}
+
+.metric:nth-child(3n) .metric-tooltip,
+.latest-metrics .metric:last-child .metric-tooltip {
+  left: auto;
+  right: 12px;
+}
+
+.metric:hover .metric-tooltip,
+.metric:focus-visible .metric-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.metric-tooltip b,
+.metric-tooltip em,
+.metric-tooltip span {
+  display: block;
+}
+
+.metric-tooltip b {
+  color: #ffffff;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.metric-tooltip em {
+  color: #c9d0c8;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.66rem;
+  font-style: normal;
+}
+
+.metric-tooltip span {
+  color: #dce3dc;
+  font-size: 0.73rem;
+  line-height: 1.45;
+  margin-bottom: 0;
+  text-transform: none;
 }
 
 .good {
