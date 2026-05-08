@@ -333,7 +333,7 @@ export default function RegimeDashboard({ initialData }) {
                     <RegimeLogo code={row.code} size={18} />
                     {row.labelZh}
                   </span>
-                  <b className={row.metrics.relativeToSpy13w >= 0 ? "good" : "bad"}>{formatPercent(row.metrics.relativeToSpy13w)}</b>
+                  <b className={tone(row.metrics.relativeToSpy13w)}>{formatPercent(row.metrics.relativeToSpy13w)}</b>
                 </span>
               </button>
             ))}

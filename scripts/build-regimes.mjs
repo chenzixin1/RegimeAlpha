@@ -35,6 +35,8 @@ const INDUSTRY_PROXIES = [
   { symbol: "SOXX", displaySymbol: "SOX", name: "Semiconductors", group: "Industry", proxyNote: "FMP EOD did not return ^SOX; SOXX is used as a liquid semiconductor proxy." },
   { symbol: "IGV", displaySymbol: "IGV", name: "Software", group: "Industry" },
   { symbol: "SMH", displaySymbol: "SMH", name: "Mega-cap Semiconductors", group: "Industry" },
+  { symbol: "DRAM", displaySymbol: "DRAM", name: "Memory & Storage", group: "Custom" },
+  { symbol: "BTCUSD", displaySymbol: "BTC", name: "Bitcoin", group: "Custom", proxyNote: "FMP BTCUSD is used as the Bitcoin proxy." },
   { symbol: "XSW", displaySymbol: "XSW", name: "Equal-weight Software", group: "Industry" },
   { symbol: "IBB", displaySymbol: "IBB", name: "Biotech", group: "Industry" },
   { symbol: "KRE", displaySymbol: "KRE", name: "Regional Banks", group: "Industry" },
@@ -354,7 +356,7 @@ function buildWeeklyRegimes(series) {
 
   const weeks = buildCalendarWeeks(spy);
   const market = buildMarketRegimeRows({ spy, vix, tlt, qqq, sectors, dateMaps, weeks });
-  const assets = ASSET_PROXIES.filter((proxy) => (enriched[proxy.symbol] || []).length >= 260);
+  const assets = ASSET_PROXIES.filter((proxy) => hasSufficientAssetHistory(proxy, enriched[proxy.symbol] || []));
   const assetRegimes = assets.map((proxy) => ({
     ...proxy,
     regimes: buildAssetRegimeRows(proxy, enriched[proxy.symbol], weeks, {
@@ -366,6 +368,11 @@ function buildWeeklyRegimes(series) {
   }));
 
   return { rows: market.rows, assetRegimes, assets };
+}
+
+function hasSufficientAssetHistory(proxy, rows) {
+  const minimumRows = proxy.group === "Custom" ? 20 : 260;
+  return rows.length >= minimumRows;
 }
 
 function buildCalendarWeeks(spy) {
@@ -496,6 +503,7 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
     const spyIndex = spyRow ? findIndexByDate(spy, spyRow.date) : -1;
     const ret13 = returnAgo(rows, endIndex, 63);
     const spyRet13 = spyIndex >= 0 ? returnAgo(spy, spyIndex, 63) : marketContext.get(week.weekEnd)?.spyRet13w;
+    const relativeToSpy13w = Number.isFinite(ret13) && Number.isFinite(spyRet13) ? ret13 - spyRet13 : null;
     const market = marketContext.get(week.weekEnd) || {};
     weeklyVolumes.push(sum(sorted.map((bar) => bar.volume)));
 
@@ -507,7 +515,7 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
       ret13w: round(ret13, 5),
       ret26w: round(returnAgo(rows, endIndex, 126), 5),
       spyRet13w: round(spyRet13, 5),
-      relativeToSpy13w: round((ret13 || 0) - (spyRet13 || 0), 5),
+      relativeToSpy13w: round(relativeToSpy13w, 5),
       tlt13w: round(rowReturnAgo(tlt, tltRow?.date, 63), 5),
       vixClose: round(vixRow?.close ?? market.vixClose, 2),
       vix4wChange: round(rowCloseChangeAgo(vix, vixRow?.date, 20) ?? market.vix4wChange, 2),
@@ -525,7 +533,7 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
       drawdown52w: round(drawdownFromHigh(rows, endIndex, 252), 5),
       aboveMa50: last.close > sma(rows, endIndex, 50),
       aboveMa200: last.close > sma(rows, endIndex, 200),
-      qqqLeadership13w: round((ret13 || 0) - (spyRet13 || 0), 5),
+      qqqLeadership13w: round(relativeToSpy13w, 5),
       sectorDispersion4w: round(market.sectorDispersion4w, 5),
       marketCode: market.marketCode,
       marketLabelZh: market.marketLabelZh

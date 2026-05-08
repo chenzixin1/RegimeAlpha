@@ -25,6 +25,7 @@ FMP_API_KEY="your_key_here" npm run update:data:refresh
 - 频率：日线聚合为周线，输出过去五年每个有交易数据的星期。
 - 模型：规则型 regime classifier，使用 PDF 中的方向漂移、实现波动、相关性、VIX、股债相关和微观结构冲击等维度。
 - 行业分化：市场 regime 仍以 `SPY` 标注；sector/industry proxy 会单独标注自己的 regime，使用各自收益、波动、趋势效率、相对 SPY 强弱、回撤和相关性。`SOX` 目前用 `SOXX` 作为半导体代理，因为 FMP EOD 对 `^SOX` 没有返回历史日线。
+- 自选板块：存储板块使用 `DRAM` ETF 作为跟踪代理；BTC 使用 `BTCUSD` 作为跟踪代理。
 - 缓存：本地优先使用 `.cache/regime-alpha.sqlite` 缓存 FMP 原始响应和周度 regime 结果；`REGIME_REFRESH=1` 可跳过缓存重拉。
 - 前端数据：脚本同时输出 `data/regimes.json` 和 `public/data/regimes.json`，页面不直接调用 FMP。
 - 密钥：脚本只从 `FMP_API_KEY` 环境变量读取，前端源码不包含 API key。
