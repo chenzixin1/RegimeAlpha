@@ -82,6 +82,31 @@ const METRIC_EXPLANATIONS = {
   }
 };
 
+const OBSERVATION_METRIC_GLOSSARY = {
+  "13W return": "近 13 周累计收益，用来判断约一个季度维度的趋势方向和强弱。",
+  "4W return": "近 4 周累计收益，用来观察短期动量是否正在加速。",
+  "4W reversal": "近 4 周方向反转特征，提示前期趋势是否出现衰竭和回拉。",
+  "52W drawdown": "相对过去 52 周高点的回撤幅度，用来识别中期下行压力。",
+  "abs 13W return": "近 13 周收益的绝对值，用来判断市场是否缺少明确方向。",
+  autocorr: "收益序列自相关，正值偏趋势延续，负值偏均值回归。",
+  drawdown: "价格从阶段高点回落的幅度，用来衡量趋势破坏程度。",
+  "equity-bond corr": "股票与长债的滚动相关性，转正时传统股债分散保护会变弱。",
+  gap: "开盘跳空幅度，常用于识别突发冲击或流动性断层。",
+  "max daily move": "单日最大绝对波动，衡量本周是否出现异常冲击。",
+  "rel SPY": "相对 SPY 的收益差，正值表示跑赢大盘，负值表示跑输。",
+  "reversal rate": "短周期反转发生频率，越高越不利于机械趋势跟随。",
+  "sector corr": "行业 ETF 之间的相关性，越高表示板块同步性越强、分散化越弱。",
+  "sector rotation": "资金在板块之间切换的强度，震荡环境中常比指数方向更重要。",
+  "SPY 13W": "SPY 近 13 周收益，作为美股大盘的中期方向代理。",
+  "TLT 13W": "TLT 近 13 周收益，作为长债表现和久期压力的代理。",
+  "trend efficiency": "趋势效率，衡量价格移动是否沿着单一方向推进，而不是来回震荡。",
+  VIX: "VIX 隐含波动率，反映市场对未来波动和风险溢价的定价。",
+  "VIX spike": "VIX 快速上冲，常表示避险需求或波动冲击突然放大。",
+  "20D vol": "20 日实现波动率，用过去约一个月日收益波动年化估算。",
+  "vol compression": "波动压缩，表示近期价格波动收敛，后续可能等待方向选择。",
+  "weekly range": "本周最高价到最低价的振幅，衡量周内路径摆动强度。"
+};
+
 const REGIME_EXPLAINERS = {
   bull_quiet: {
     signal: "13 周收益为正，VIX 和 20D 实现波动偏低，行业相关性下降。",
@@ -589,9 +614,30 @@ function RegimeLegend({ definitions, strategyMap, activeCode, onSelect }) {
 
 function RegimeReference({ definitions, strategyMap, activeCode }) {
   const [expanded, setExpanded] = useState(false);
+  const [referenceTooltip, setReferenceTooltip] = useState(null);
   const entries = Object.entries(definitions).sort(([, a], [, b]) => a.order - b.order);
   const activeDefinition = definitions[activeCode] || entries[0]?.[1];
   const activeExplainer = REGIME_EXPLAINERS[activeCode] || {};
+  const referenceTooltipPosition = (clientX, clientY) => ({
+    x: Math.max(12, Math.min(clientX + 14, window.innerWidth - 430)),
+    y: Math.max(12, Math.min(clientY + 14, window.innerHeight - 330))
+  });
+  const showReferenceTooltip = (code, definition, explainer, event, fromFocus = false) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = fromFocus
+      ? referenceTooltipPosition(rect.right, rect.top)
+      : referenceTooltipPosition(event.clientX, event.clientY);
+    setReferenceTooltip({
+      ...position,
+      code,
+      labelZh: definition.labelZh,
+      label: definition.label,
+      signal: explainer.signal || definition.thesis,
+      metrics: explainer.metrics || "-",
+      items: buildObservationItems(explainer.metrics)
+    });
+  };
+  const hideReferenceTooltip = () => setReferenceTooltip(null);
 
   return (
     <section className={`regime-reference ${expanded ? "expanded" : ""}`} aria-label="Regime reference table">
@@ -635,7 +681,19 @@ function RegimeReference({ definitions, strategyMap, activeCode }) {
                     <RegimeChip code={code} label={definition.labelZh} />
                   </td>
                   <td>{explainer.signal || definition.thesis}</td>
-                  <td>{explainer.metrics || "-"}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="reference-metrics-trigger"
+                      onBlur={hideReferenceTooltip}
+                      onFocus={(event) => showReferenceTooltip(code, definition, explainer, event, true)}
+                      onMouseEnter={(event) => showReferenceTooltip(code, definition, explainer, event)}
+                      onMouseLeave={hideReferenceTooltip}
+                      onMouseMove={(event) => showReferenceTooltip(code, definition, explainer, event)}
+                    >
+                      {explainer.metrics || "-"}
+                    </button>
+                  </td>
                   <td>{strategies.best?.join(" / ") || "-"}</td>
                   <td>{strategies.avoid?.join(" / ") || "-"}</td>
                 </tr>
@@ -644,8 +702,38 @@ function RegimeReference({ definitions, strategyMap, activeCode }) {
           </tbody>
         </table>
       </div>
+      {referenceTooltip ? (
+        <div className="reference-metrics-tooltip" role="tooltip" style={{ left: referenceTooltip.x, top: referenceTooltip.y }}>
+          <div className="tooltip-kicker">
+            <strong>{referenceTooltip.labelZh}</strong>
+            <span>{referenceTooltip.label}</span>
+          </div>
+          <div className="reference-tooltip-title">观察指标怎么读</div>
+          <p>{referenceTooltip.signal}</p>
+          <div className="reference-tooltip-metrics">{referenceTooltip.metrics}</div>
+          <dl>
+            {referenceTooltip.items.map((item) => (
+              <div key={item.term}>
+                <dt>{item.term}</dt>
+                <dd>{item.detail}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function buildObservationItems(metrics = "") {
+  return metrics
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((term) => ({
+      term,
+      detail: OBSERVATION_METRIC_GLOSSARY[term] || "该指标用于辅助判断当前 regime 的方向、波动、相关性或微观结构状态。"
+    }));
 }
 
 function RegimeChip({ code, label, mini = false }) {

@@ -752,6 +752,87 @@ input {
   width: 210px;
 }
 
+.reference-metrics-trigger {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: help;
+  display: block;
+  line-height: 1.45;
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+}
+
+.reference-metrics-trigger:hover,
+.reference-metrics-trigger:focus-visible {
+  color: var(--ink);
+  outline: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.reference-metrics-tooltip {
+  background: #161a1d;
+  border: 1px solid #2f3532;
+  border-radius: 7px;
+  box-shadow: 0 18px 42px rgba(22, 26, 29, 0.24);
+  color: #f7faf4;
+  inline-size: min(410px, calc(100vw - 24px));
+  padding: 12px 13px;
+  pointer-events: none;
+  position: fixed;
+  z-index: 80;
+}
+
+.reference-tooltip-title {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  margin-top: 6px;
+}
+
+.reference-metrics-tooltip p {
+  color: #dce3dc;
+  font-size: 0.74rem;
+  line-height: 1.48;
+  margin: 6px 0 9px;
+}
+
+.reference-tooltip-metrics {
+  color: #c9d0c8;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  margin-bottom: 8px;
+}
+
+.reference-metrics-tooltip dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.reference-metrics-tooltip dl div {
+  display: grid;
+  gap: 2px;
+}
+
+.reference-metrics-tooltip dt {
+  color: #ffffff;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.69rem;
+  font-weight: 800;
+}
+
+.reference-metrics-tooltip dd {
+  color: #dce3dc;
+  font-size: 0.72rem;
+  line-height: 1.42;
+  margin: 0;
+}
+
 .reference-table td:nth-child(4),
 .reference-table td:nth-child(5) {
   width: 240px;
