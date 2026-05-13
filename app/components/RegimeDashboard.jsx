@@ -176,6 +176,9 @@ export default function RegimeDashboard({ initialData }) {
   const selected = rows.find((row) => row.weekEnd === selectedWeek) || latest;
   const selectedAsset = assetRegimes.find((asset) => asset.symbol === selectedAssetSymbol) || assetRegimes[0];
   const selectedAssetRow = selectedAsset?.regimes.find((row) => row.weekEnd === selected.weekEnd) || selectedAsset?.regimes.at(-1);
+  const detailIsAsset = Boolean(selectedAssetRow);
+  const detailRow = selectedAssetRow || selected;
+  const detailStrategies = detailIsAsset ? initialData.strategyMap?.[detailRow.code] : selected.strategies;
   const assetRowsForWeek = useMemo(
     () =>
       assetRegimes
@@ -431,54 +434,53 @@ export default function RegimeDashboard({ initialData }) {
           ) : null}
         </section>
 
-        <aside className="detail-panel" style={{ "--accent": COLORS[selected.code] }}>
+        <aside className="detail-panel" style={{ "--accent": COLORS[detailRow.code] }}>
           <PanelTitle
             title={
               <>
-                <RegimeLogo code={selected.code} size={24} />
-                {selected.labelZh}
+                <RegimeLogo code={detailRow.code} size={24} />
+                {detailRow.labelZh}
               </>
             }
-            meta={selected.weekEnd}
+            meta={detailIsAsset ? `${detailRow.displaySymbol} · ${detailRow.name} · ${detailRow.weekEnd}` : selected.weekEnd}
           />
-          <p className="detail-thesis">{selected.thesis}</p>
+          {detailIsAsset && selectedAsset?.proxyNote ? <p className="proxy-note">{selectedAsset.proxyNote}</p> : null}
+          <p className="detail-thesis">{detailRow.thesis}</p>
           <div className="driver-list">
-            {selected.drivers.map((driver) => (
+            {detailRow.drivers.map((driver) => (
               <span key={driver}>{driver}</span>
             ))}
           </div>
           <div className="metric-grid compact">
-            <Metric label="1W" value={formatPercent(selected.metrics.weeklyReturn)} tone={tone(selected.metrics.weeklyReturn)} />
-            <Metric label="4W" value={formatPercent(selected.metrics.ret4w)} tone={tone(selected.metrics.ret4w)} />
-            <Metric label="20D Vol" value={formatPercent(selected.metrics.realizedVol20)} />
-            <Metric label="Corr" value={number(selected.metrics.sectorCorrelation20, 2)} />
-            <Metric label="Eq/Bond" value={number(selected.metrics.equityBondCorrelation63, 2)} />
-            <Metric label="DD 52W" value={formatPercent(selected.metrics.drawdown52w)} tone="bad" />
-          </div>
-          <StrategyBlock strategies={selected.strategies} />
-          {selectedAssetRow ? (
-            <div className="asset-detail" style={{ "--accent": COLORS[selectedAssetRow.code] }}>
-              <div className="asset-detail-title">
-                <h4>
-                  <RegimeLogo code={selectedAssetRow.code} size={22} />
-                  {selectedAssetRow.displaySymbol} · {selectedAssetRow.name}
-                </h4>
-                <span>{selectedAssetRow.labelZh}</span>
-              </div>
-              {selectedAsset?.proxyNote ? <p className="proxy-note">{selectedAsset.proxyNote}</p> : null}
-              <div className="driver-list">
-                {selectedAssetRow.drivers.map((driver) => (
-                  <span key={driver}>{driver}</span>
-                ))}
-              </div>
-              <div className="metric-grid compact">
-                <Metric label="13W" value={formatPercent(selectedAssetRow.metrics.ret13w)} tone={tone(selectedAssetRow.metrics.ret13w)} />
-                <Metric label="Rel SPY" value={formatPercent(selectedAssetRow.metrics.relativeToSpy13w)} tone={tone(selectedAssetRow.metrics.relativeToSpy13w)} />
-                <Metric label="20D Vol" value={formatPercent(selectedAssetRow.metrics.realizedVol20)} />
-                <Metric label="Corr SPY" value={number(selectedAssetRow.metrics.correlationToSpy63, 2)} />
+            {detailIsAsset ? (
+              <>
+                <Metric label="13W" value={formatPercent(detailRow.metrics.ret13w)} tone={tone(detailRow.metrics.ret13w)} />
+                <Metric label="Rel SPY" value={formatPercent(detailRow.metrics.relativeToSpy13w)} tone={tone(detailRow.metrics.relativeToSpy13w)} />
+                <Metric label="20D Vol" value={formatPercent(detailRow.metrics.realizedVol20)} />
+                <Metric label="Corr SPY" value={number(detailRow.metrics.correlationToSpy63, 2)} />
                 <Metric label="SPY 大盘" value={selected.labelZh} />
-                <Metric label="Confidence" value={formatPercent(selectedAssetRow.confidence)} />
-              </div>
+                <Metric label="Confidence" value={formatPercent(detailRow.confidence)} />
+              </>
+            ) : (
+              <>
+                <Metric label="1W" value={formatPercent(selected.metrics.weeklyReturn)} tone={tone(selected.metrics.weeklyReturn)} />
+                <Metric label="4W" value={formatPercent(selected.metrics.ret4w)} tone={tone(selected.metrics.ret4w)} />
+                <Metric label="20D Vol" value={formatPercent(selected.metrics.realizedVol20)} />
+                <Metric label="Corr" value={number(selected.metrics.sectorCorrelation20, 2)} />
+                <Metric label="Eq/Bond" value={number(selected.metrics.equityBondCorrelation63, 2)} />
+                <Metric label="DD 52W" value={formatPercent(selected.metrics.drawdown52w)} tone="bad" />
+              </>
+            )}
+          </div>
+          <StrategyBlock strategies={detailStrategies} />
+          {detailIsAsset ? (
+            <div className="market-context" style={{ "--accent": COLORS[selected.code] }}>
+              <span>SPY 大盘对照</span>
+              <strong>
+                <RegimeLogo code={selected.code} size={18} />
+                {selected.labelZh}
+              </strong>
+              <p>{selected.thesis}</p>
             </div>
           ) : null}
         </aside>

@@ -1007,6 +1007,36 @@ input {
   line-height: 1.5;
 }
 
+.market-context {
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.market-context span {
+  color: var(--muted);
+  display: block;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.72rem;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.market-context strong {
+  align-items: center;
+  color: color-mix(in oklch, var(--accent) 62%, #111);
+  display: flex;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.market-context p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
 .timeline-panel {
   overflow: hidden;
 }
