@@ -76,9 +76,9 @@ const METRIC_EXPLANATIONS = {
     title: "与 SPY 相关性",
     body: "该资产与 SPY 的近 63 个交易日滚动相关。接近 1 表示同涨同跌更明显，接近 0 或负值表示独立性更强。"
   },
-  Market: {
-    title: "市场 Regime",
-    body: "同一周 SPY 市场层面的 regime 标签，用来对比当前资产与整体市场环境是否一致。"
+  "SPY 大盘": {
+    title: "SPY 大盘 Regime",
+    body: "这是同一周 SPY 代表的大盘 regime，用来和当前资产自己的 regime 对比。它不等于上方资产卡片里的行业/资产 regime。"
   }
 };
 
@@ -476,7 +476,7 @@ export default function RegimeDashboard({ initialData }) {
                 <Metric label="Rel SPY" value={formatPercent(selectedAssetRow.metrics.relativeToSpy13w)} tone={tone(selectedAssetRow.metrics.relativeToSpy13w)} />
                 <Metric label="20D Vol" value={formatPercent(selectedAssetRow.metrics.realizedVol20)} />
                 <Metric label="Corr SPY" value={number(selectedAssetRow.metrics.correlationToSpy63, 2)} />
-                <Metric label="Market" value={selected.labelZh} />
+                <Metric label="SPY 大盘" value={selected.labelZh} />
                 <Metric label="Confidence" value={formatPercent(selectedAssetRow.confidence)} />
               </div>
             </div>
