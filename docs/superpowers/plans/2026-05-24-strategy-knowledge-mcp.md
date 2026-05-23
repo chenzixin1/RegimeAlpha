@@ -536,6 +536,7 @@ import {
   latestAssets,
   loadRegimeData,
   marketContextForWeek,
+  normalizeSymbol,
   publicLinks,
   publicMetadata,
   textResult
@@ -663,6 +664,7 @@ assert(positionPayload.positions[0].symbol === "DRAM", "Expected DRAM position")
 assert(positionPayload.positions[0].currentRegime?.labelZh, "Expected current regime data");
 assert(positionPayload.positions[0].riskTags.length > 0, "Expected risk tags");
 assert(positionPayload.positions[0].missingInputs.requiredForSpecificAssessment.includes("strike"), "Expected strike missing input");
+assert(positionPayload.positions[0].missingInputs.requiredForSpecificAssessment.includes("expiry"), "Expected expiry missing input when absent");
 assert(positionPayload.positions[0].missingInputs.usefulForSizing.includes("position size"), "Expected position size missing input");
 assert(positionPayload.positions[0].missingInputs.optionalContext.includes("portfolio concentration"), "Expected optional context missing input");
 assert(positionPayload.positions[1].normalizedSymbol === "SOXX", "Expected SOX to normalize to SOXX");
@@ -678,6 +680,33 @@ const fallbackResult = await client.callTool({
 });
 const fallbackPayload = JSON.parse(fallbackResult.content[0].text);
 assert(fallbackPayload.positions[0].regimeSource === "defaultRegime", "Expected defaultRegime fallback");
+assert(fallbackPayload.positions[0].missingInputs.requiredForSpecificAssessment.includes("expiry"), "Expected expiry missing input");
+
+const invalidRegimeResult = await client.callTool({
+  name: "get_regime_strategy",
+  arguments: { regime: "not_a_regime" }
+});
+assert(invalidRegimeResult.isError === true, "Expected invalid regime to be an MCP error result");
+assert(invalidRegimeResult.content[0].text.includes("bull_quiet"), "Expected valid regime options in error text");
+
+const invalidInstrumentResult = await client.callTool({
+  name: "get_instrument_guidance",
+  arguments: { instrument: "not_an_instrument" }
+});
+assert(invalidInstrumentResult.isError === true, "Expected invalid instrument to be an MCP error result");
+assert(invalidInstrumentResult.content[0].text.includes("otm_options"), "Expected valid instrument options in error text");
+
+const invalidPositionResult = await client.callTool({
+  name: "map_position_to_regime_risks",
+  arguments: {
+    positions: [
+      { symbol: "DRAM", instrument: "not_an_instrument", regime: "not_a_regime", side: "long" }
+    ],
+    useCurrentRegimeData: false
+  }
+});
+const invalidPositionPayload = JSON.parse(invalidPositionResult.content[0].text);
+assert(invalidPositionPayload.positions[0].errors.length >= 2, "Expected per-position invalid regime and instrument errors");
 
 const articleResult = await client.callTool({
   name: "get_article_chunks",
@@ -744,6 +773,7 @@ import {
   findWeek,
   loadRegimeData,
   marketContextForWeek,
+  normalizeSymbol,
   publicMetadata,
   textResult
 } from "./regime-data-utils.js";
@@ -824,13 +854,13 @@ Then implement the remaining five tools:
 
 ```js
 {
-  requiredForSpecificAssessment: ["strike", "moneyness", "implied volatility or IV rank"],
+  requiredForSpecificAssessment: ["expiry", "strike", "moneyness", "implied volatility or IV rank"],
   usefulForSizing: ["position size", "cost basis"],
   optionalContext: ["portfolio concentration", "hedge relationship"]
 }
 ```
 
-  - Build this classification from instrument type. For `otm_options`, `strike`, `moneyness`, and `implied volatility or IV rank` are required if absent; `position size` and `cost basis` are useful for sizing if absent; `portfolio concentration` and `hedge relationship` are optional context.
+  - Build this classification from instrument type. For `otm_options`, `expiry`, `strike`, `moneyness`, and `implied volatility or IV rank` are required if absent; `position size` and `cost basis` are useful for sizing if absent; `portfolio concentration` and `hedge relationship` are optional context.
 
 - Error/no-match behavior:
   - `get_strategy_playbook` should not throw for invalid filters. Return empty `matchedStrategies` plus:
