@@ -62,6 +62,34 @@ Pages 生产环境需要配置：
 
 - `OPENROUTER_API_KEY`：OpenRouter 调用密钥。
 
+## 数据接口与 MCP
+
+给其他 agent 或脚本使用时，优先用这两个入口：
+
+- JSON API：`https://regimealpha.chenzixin.uk/api/export`
+- MCP endpoint：`https://regimealpha.chenzixin.uk/mcp`
+
+JSON API 支持轻量过滤：
+
+```bash
+curl "https://regimealpha.chenzixin.uk/api/export"
+curl "https://regimealpha.chenzixin.uk/api/export?symbol=DRAM&limit=8"
+curl "https://regimealpha.chenzixin.uk/api/export?symbol=SOX&weekEnd=2026-05-22"
+```
+
+MCP 由 `regimealpha-mcp` Worker 提供，使用 Cloudflare Agents SDK 的 `createMcpHandler()` 实现无状态远程 MCP。它暴露四个工具：
+
+- `get_latest_regime`：返回最新大盘 regime 和资产快照。
+- `get_asset_regime`：查询单个标的的当前或指定周 regime。
+- `compare_assets`：比较多个标的在同一周的 regime 和关键指标。
+- `list_regime_weeks`：列出近期周度 market regime，可附带一个资产序列。
+
+常用部署命令：
+
+```bash
+npm run deploy:mcp
+```
+
 ## Vercel 口径
 
 当前设计对 Vercel 友好：构建阶段运行 `npm run update:data`，运行时页面读取随部署产物一起发布的 JSON。Vercel Serverless 文件系统不适合持久写入 SQLite；如果后续要做线上定时刷新，应把缓存适配层替换为 Vercel KV/Postgres 或 Turso/libSQL，并把 `FMP_API_KEY` 配到 Vercel 环境变量。

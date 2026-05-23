@@ -9,15 +9,19 @@
     "build:static": "next build",
     "deploy:cloudflare": "npm run build && wrangler pages deploy out --project-name regimealpha --branch main",
     "deploy:worker": "wrangler deploy --config wrangler.regime-updater.jsonc",
+    "deploy:mcp": "wrangler deploy --config wrangler.regime-mcp.jsonc",
     "start": "next start",
     "update:data": "node scripts/build-regimes.mjs",
     "update:data:incremental": "REGIME_INCREMENTAL=1 node scripts/build-regimes.mjs",
     "update:data:refresh": "REGIME_REFRESH=1 node scripts/build-regimes.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "agents": "^0.13.2",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "wrangler": "^4.90.0"

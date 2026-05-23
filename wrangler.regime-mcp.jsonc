@@ -1,0 +1,18 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "regimealpha-mcp",
+  "main": "workers/regime-mcp.js",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "REGIME_APP_URL": "https://regimealpha.chenzixin.uk",
+    "REGIME_DATA_URL": "https://regimealpha.chenzixin.uk/data/regimes.json"
+  },
+  "routes": [
+    {
+      "pattern": "regimealpha.chenzixin.uk/mcp*",
+      "zone_name": "chenzixin.uk"
+    }
+  ]
+}
