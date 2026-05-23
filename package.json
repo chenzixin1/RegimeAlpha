@@ -14,7 +14,8 @@
     "update:data": "node scripts/build-regimes.mjs",
     "update:data:incremental": "REGIME_INCREMENTAL=1 node scripts/build-regimes.mjs",
     "update:data:refresh": "REGIME_REFRESH=1 node scripts/build-regimes.mjs",
-    "verify:strategy-knowledge": "node scripts/verify-strategy-knowledge.mjs"
+    "verify:strategy-knowledge": "node scripts/verify-strategy-knowledge.mjs",
+    "verify:mcp-strategy": "node scripts/verify-mcp-strategy.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

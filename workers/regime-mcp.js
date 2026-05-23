@@ -16,6 +16,7 @@ import {
   publicMetadata,
   textResult
 } from "./regime-data-utils.js";
+import { registerStrategyTools } from "./strategy-tools.js";
 
 function createServer(env) {
   const server = new McpServer({
@@ -121,6 +122,8 @@ function createServer(env) {
       });
     }
   );
+
+  registerStrategyTools(server, env);
 
   return server;
 }
