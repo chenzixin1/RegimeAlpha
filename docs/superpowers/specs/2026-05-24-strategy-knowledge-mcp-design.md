@@ -36,7 +36,7 @@ RegimeAlpha already has:
   - `compare_assets`
   - `list_regime_weeks`
 - `functions/_data/articleContext.js`: extracted PDF chunks used by the chat assistant.
-- `data.regimes.json.strategyMap`: regime-level best/avoid strategy metadata used by the page.
+- `/data/regimes.json.strategyMap`: regime-level best/avoid strategy metadata used by the page.
 
 The new work should reuse the existing article context and regime taxonomy, but introduce a dedicated strategy knowledge module instead of expanding the market-data JSON with large article-derived prose.
 
@@ -61,6 +61,52 @@ Create a strategy knowledge module that can be imported by the MCP Worker and, o
 The MCP Worker remains stateless. It fetches current regime data from the existing production data URL when tools need live data, and imports static strategy/article modules at build time.
 
 ## Strategy Knowledge Schema
+
+### First-Version Coverage
+
+The first implementation is considered complete only if the curated knowledge base covers the full current regime and instrument surface, not only one DRAM/options example.
+
+Minimum first-version content:
+
+- Regime strategy entries: at least one entry for each of the ten current regimes:
+  - `bull_quiet`
+  - `bull_volatile`
+  - `bear_quiet`
+  - `bear_volatile`
+  - `sideways_quiet`
+  - `sideways_volatile`
+  - `trend_accelerating`
+  - `mean_reverting`
+  - `stagflationary`
+  - `microstructure_dislocation`
+- Instrument guidance entries: at least one cross-regime guidance entry for each supported instrument family:
+  - `long_equity`
+  - `etf`
+  - `letf`
+  - `options`
+  - `otm_options`
+  - `spreads`
+  - `hedge`
+  - `cash`
+- Risk rules: at least these reusable risk tags:
+  - `variance_drain`
+  - `vol_crush`
+  - `theta_decay`
+  - `short_gamma`
+  - `cta_deleveraging`
+  - `correlation_spike`
+  - `whipsaw`
+  - `liquidity_gap`
+- Transition signals: at least these families:
+  - quiet bull persistence
+  - quiet bull to volatile bull
+  - volatile/sideways chop to trend acceleration
+  - trend acceleration to mean reversion
+  - high correlation/high VIX to bear volatile
+  - equity-bond correlation stress to stagflationary
+  - gap/range shock to microstructure dislocation
+
+The first version does not need exhaustive strategy variants for every regime/instrument pair. It does need enough coverage that any current regime and any supported instrument family returns a useful structured answer.
 
 ### Core Principles
 
@@ -145,6 +191,22 @@ Supported modes:
 - `none`: return only structured strategy knowledge. This is the default.
 - `relevant_chunks`: return article chunks matching regime, instrument, risk tags, and free-text query.
 - `full_article`: return paginated article chunks. Never dump the whole article in one response.
+
+Availability:
+
+- `get_strategy_playbook` supports `none`, `relevant_chunks`, and `full_article`.
+- `get_regime_strategy` supports `none` and `relevant_chunks`.
+- `get_instrument_guidance` supports `none` and `relevant_chunks`.
+- `map_position_to_regime_risks` supports `none` and `relevant_chunks`, but defaults to `none` to keep position-risk responses compact.
+- `search_article_context` always returns relevant chunks.
+- `get_article_chunks` is the dedicated full-article pagination tool.
+
+Pagination:
+
+- `articleLimit` defaults to `5`.
+- `articleLimit` has a hard maximum of `12` chunks per response.
+- `cursor` is an opaque string containing the next zero-based chunk offset, encoded as a decimal string in the first version, such as `"12"`.
+- `hasMore` is `false` when the next offset is beyond the final chunk.
 
 Article payload:
 
@@ -240,10 +302,12 @@ Inputs:
 
 ```json
 {
+  "defaultRegime": "sideways_volatile",
   "positions": [
     {
       "symbol": "DRAM",
       "instrument": "otm_options",
+      "regime": null,
       "side": "long",
       "expiry": "2026-09-18",
       "strike": null,
@@ -266,6 +330,13 @@ Output:
 - guardrails
 
 This tool must not say "buy", "sell", "add", or "close" as an instruction. It can say "evaluate whether X structure reduces Y risk" or "the holding is exposed to theta and vol crush under current regime."
+
+Regime fallback rules:
+
+- If `useCurrentRegimeData=true` and the symbol is known, use the current asset regime.
+- If the symbol is unknown but `position.regime` is supplied, use `position.regime` for generic instrument/regime guidance.
+- If the symbol is unknown and `position.regime` is absent but `defaultRegime` is supplied, use `defaultRegime`.
+- If no symbol data and no regime fallback exists, return instrument-only guidance plus a `missingInputs` item for regime.
 
 ### `search_article_context`
 
@@ -306,6 +377,45 @@ Optionally add a future lightweight endpoint:
 - `/api/strategy?regime=sideways_volatile&instrument=options`
 
 This is not required for the first MCP-first version unless implementation is trivial after the MCP module is built.
+
+## Guardrails
+
+Every strategy MCP response must include a reusable `guardrails` object:
+
+```json
+{
+  "notInvestmentAdvice": true,
+  "scope": "research_framework",
+  "allowedLanguage": [
+    "risk mapping",
+    "scenario analysis",
+    "inputs to verify",
+    "possible structures to evaluate"
+  ],
+  "disallowedLanguage": [
+    "direct buy/sell instructions",
+    "position sizing commands",
+    "guaranteed outcomes"
+  ],
+  "requiresUserInputsForSpecificity": [
+    "position size",
+    "cost basis",
+    "expiry",
+    "strike",
+    "implied volatility or IV rank",
+    "portfolio concentration"
+  ]
+}
+```
+
+This object applies to:
+
+- `get_strategy_playbook`
+- `get_regime_strategy`
+- `get_instrument_guidance`
+- `map_position_to_regime_risks`
+
+Article-only tools do not need the full guardrail object, but should still label article text as source context rather than live market data.
 
 ## Source Attribution
 
