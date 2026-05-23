@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COLORS = {
   bull_quiet: "#2e9d68",
@@ -161,6 +161,7 @@ const REGIME_EXPLAINERS = {
 };
 
 export default function RegimeDashboard({ initialData }) {
+  const [data, setData] = useState(initialData);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
   const [selectedAssetSymbol, setSelectedAssetSymbol] = useState("SOXX");
   const [heatmapKey, setHeatmapKey] = useState("MARKET");
@@ -169,16 +170,36 @@ export default function RegimeDashboard({ initialData }) {
   const [query, setQuery] = useState("");
   const [heatmapTooltip, setHeatmapTooltip] = useState(null);
 
-  const rows = initialData.regimes;
-  const assetRegimes = initialData.assetRegimes || [];
-  const definitions = initialData.regimeDefinitions;
-  const latest = initialData.summary.latest;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWorkerData() {
+      try {
+        const response = await fetch(`/data/regimes.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const nextData = await response.json();
+        if (!cancelled && nextData?.summary?.latest?.weekEnd) {
+          setData(nextData);
+        }
+      } catch {
+        // Keep the static build-time data if the Worker route is unavailable.
+      }
+    }
+    loadWorkerData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows = data.regimes;
+  const assetRegimes = data.assetRegimes || [];
+  const definitions = data.regimeDefinitions;
+  const latest = data.summary.latest;
   const selected = rows.find((row) => row.weekEnd === selectedWeek) || latest;
   const selectedAsset = assetRegimes.find((asset) => asset.symbol === selectedAssetSymbol) || assetRegimes[0];
   const selectedAssetRow = selectedAsset?.regimes.find((row) => row.weekEnd === selected.weekEnd) || selectedAsset?.regimes.at(-1);
   const detailIsAsset = Boolean(selectedAssetRow);
   const detailRow = selectedAssetRow || selected;
-  const detailStrategies = detailIsAsset ? initialData.strategyMap?.[detailRow.code] : selected.strategies;
+  const detailStrategies = detailIsAsset ? data.strategyMap?.[detailRow.code] : selected.strategies;
   const assetRowsForWeek = useMemo(
     () =>
       assetRegimes
@@ -222,6 +243,12 @@ export default function RegimeDashboard({ initialData }) {
   const heatmapTab = heatmapTabs.find((tab) => tab.key === heatmapKey) || heatmapTabs[0];
   const heatmapRows = heatmapTab?.regimes || rows;
   const heatmapSelectedRow = heatmapRows.find((row) => row.weekEnd === selected.weekEnd) || heatmapRows.at(-1);
+
+  useEffect(() => {
+    if (!rows.some((row) => row.weekEnd === selectedWeek)) {
+      setSelectedWeek(latest.weekEnd);
+    }
+  }, [latest.weekEnd, rows, selectedWeek]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -269,8 +296,8 @@ export default function RegimeDashboard({ initialData }) {
         </div>
         <div className="freshness">
           <span>数据截至</span>
-          <strong>{initialData.metadata.dataThrough}</strong>
-          <span>生成于 {formatDateTime(initialData.metadata.generatedAt)}</span>
+          <strong>{data.metadata.dataThrough}</strong>
+          <span>生成于 {formatDateTime(data.metadata.generatedAt)}</span>
         </div>
       </header>
 
@@ -315,11 +342,11 @@ export default function RegimeDashboard({ initialData }) {
           <PanelTitle title="五年周度热力图" meta={`${heatmapTab.displaySymbol} · ${heatmapRows.length} weeks`} />
           <RegimeLegend
             definitions={definitions}
-            strategyMap={initialData.strategyMap}
+            strategyMap={data.strategyMap}
             activeCode={referenceCode}
             onSelect={setReferenceCode}
           />
-          <RegimeReference definitions={definitions} strategyMap={initialData.strategyMap} activeCode={referenceCode} />
+          <RegimeReference definitions={definitions} strategyMap={data.strategyMap} activeCode={referenceCode} />
           <div className="heatmap-tabs" aria-label="Heatmap data source">
             {heatmapTabs.map((tab) => {
               const rowForTab = tab.regimes.find((row) => row.weekEnd === selected.weekEnd) || tab.regimes.at(-1);
@@ -486,14 +513,14 @@ export default function RegimeDashboard({ initialData }) {
         </aside>
 
         <section className="timeline-panel">
-          <PanelTitle title="SPY 累计表现与 Regime 序列" meta={`${initialData.metadata.requestedStart} - ${initialData.metadata.dataThrough}`} />
+          <PanelTitle title="SPY 累计表现与 Regime 序列" meta={`${data.metadata.requestedStart} - ${data.metadata.dataThrough}`} />
           <Timeline rows={rows} cumulative={cumulative} selected={selected} onSelect={setSelectedWeek} />
         </section>
 
         <section className="summary-panel">
           <PanelTitle title="Regime 分布" meta="count / avg return" />
           <div className="regime-list">
-            {initialData.summary.byRegime.map((item) => (
+            {data.summary.byRegime.map((item) => (
               <button
                 key={item.code}
                 className="regime-row"
@@ -561,9 +588,9 @@ export default function RegimeDashboard({ initialData }) {
         </section>
 
         <section className="method-panel">
-          <PanelTitle title="模型口径" meta={initialData.metadata.model} />
+          <PanelTitle title="模型口径" meta={data.metadata.model} />
           <div className="method-grid">
-            {initialData.metadata.methodology.map((item) => (
+            {data.metadata.methodology.map((item) => (
               <p key={item}>{item}</p>
             ))}
           </div>

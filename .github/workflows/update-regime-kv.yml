@@ -1,0 +1,78 @@
+name: Update RegimeAlpha KV data
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Trigger reason"
+        required: false
+        default: "manual"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-regime-kv
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh and publish regime data
+    runs-on: ubuntu-latest
+    env:
+      FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+      WORKER_UPDATE_TOKEN: ${{ secrets.WORKER_UPDATE_TOKEN }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capture previous data date
+        id: before
+        run: echo "date=$(node -p \"require('./data/regimes.json').metadata.dataThrough\")" >> "$GITHUB_OUTPUT"
+
+      - name: Refresh data
+        id: refresh
+        run: |
+          AS_OF_DATE="$(TZ=Asia/Shanghai date +%F)"
+          echo "as_of=${AS_OF_DATE}" >> "$GITHUB_OUTPUT"
+          AS_OF_DATE="$AS_OF_DATE" npm run update:data:incremental
+
+      - name: Validate static build
+        run: npm run build:static
+
+      - name: Capture refreshed data date
+        id: after
+        run: echo "date=$(node -p \"require('./data/regimes.json').metadata.dataThrough\")" >> "$GITHUB_OUTPUT"
+
+      - name: Publish JSON to Cloudflare Worker KV
+        run: |
+          curl --fail --show-error --silent \
+            --request POST \
+            --header "Authorization: Bearer ${WORKER_UPDATE_TOKEN}" \
+            --header "Content-Type: application/json" \
+            --data-binary @public/data/regimes.json \
+            https://regimealpha.chenzixin.uk/api/regime-update/publish
+
+      - name: Skip commit if market data did not advance
+        if: steps.before.outputs.date == steps.after.outputs.date
+        run: |
+          git checkout -- data/regimes.json public/data/regimes.json
+          echo "No newer market data is available yet. Current dataThrough=${{ steps.after.outputs.date }}."
+
+      - name: Commit refreshed data
+        if: steps.before.outputs.date != steps.after.outputs.date
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/regimes.json public/data/regimes.json
+          git commit -m "Refresh regime data through ${{ steps.after.outputs.date }}"
+          git push

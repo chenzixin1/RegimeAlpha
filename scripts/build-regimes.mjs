@@ -8,14 +8,27 @@ loadLocalEnv([".env.local", ".env"]);
 const API_KEY = process.env.FMP_API_KEY;
 const AS_OF = process.env.AS_OF_DATE || new Date().toISOString().slice(0, 10);
 const REFRESH = process.env.REGIME_REFRESH === "1";
+const INCREMENTAL = process.env.REGIME_INCREMENTAL === "1";
+const PREVIOUS_PAYLOAD_PATH = process.env.REGIME_PREVIOUS_PAYLOAD || "data/regimes.json";
 const SQLITE_BIN = process.env.SQLITE_BIN || "sqlite3";
 const SQLITE_PATH = process.env.REGIME_SQLITE_PATH || ".cache/regime-alpha.sqlite";
 const SQLITE_ENABLED = process.env.REGIME_CACHE !== "off" && commandExists(SQLITE_BIN);
 
 const DAY = 24 * 60 * 60 * 1000;
+const PREVIOUS_PAYLOAD = INCREMENTAL ? readPreviousPayload(PREVIOUS_PAYLOAD_PATH) : null;
 const OUTPUT_END = parseDate(AS_OF);
-const OUTPUT_START = addYears(OUTPUT_END, -5);
-const FETCH_START = addDays(OUTPUT_START, -460);
+const FULL_OUTPUT_START = addYears(OUTPUT_END, -5);
+const INCREMENTAL_REPLACE_START = PREVIOUS_PAYLOAD?.metadata?.dataThrough
+  ? startOfWeek(addDays(parseDate(PREVIOUS_PAYLOAD.metadata.dataThrough), -120))
+  : FULL_OUTPUT_START;
+const OUTPUT_START = process.env.REGIME_OUTPUT_START_DATE
+  ? parseDate(process.env.REGIME_OUTPUT_START_DATE)
+  : INCREMENTAL
+    ? maxDate(FULL_OUTPUT_START, INCREMENTAL_REPLACE_START)
+    : FULL_OUTPUT_START;
+const FETCH_START = process.env.REGIME_FETCH_START_DATE
+  ? parseDate(process.env.REGIME_FETCH_START_DATE)
+  : addDays(OUTPUT_START, -460);
 
 const PRIMARY_SYMBOLS = ["SPY", "^VIX", "TLT", "QQQ", "IWM"];
 const BROAD_SECTOR_PROXIES = [
@@ -230,7 +243,7 @@ async function main() {
 
   const { rows, assetRegimes, assets } = buildWeeklyRegimes(series);
   const dataThrough = rows.at(-1)?.weekEnd || null;
-  const payload = {
+  let payload = {
     metadata: {
       generatedAt: new Date().toISOString(),
       requestedStart: formatDate(OUTPUT_START),
@@ -265,6 +278,10 @@ async function main() {
     }
   };
 
+  if (INCREMENTAL && PREVIOUS_PAYLOAD) {
+    payload = mergeIncrementalPayload(PREVIOUS_PAYLOAD, payload);
+  }
+
   saveRegimeRows(payload);
 
   await mkdir("data", { recursive: true });
@@ -272,7 +289,14 @@ async function main() {
   const json = `${JSON.stringify(payload, null, 2)}\n`;
   await writeFile("data/regimes.json", json);
   await writeFile("public/data/regimes.json", json);
-  console.log(`Wrote data/regimes.json and public/data/regimes.json with ${rows.length} weekly regimes through ${dataThrough}.`);
+  console.log(
+    `Wrote data/regimes.json and public/data/regimes.json with ${payload.regimes.length} weekly regimes through ${payload.metadata.dataThrough}.`
+  );
+  if (INCREMENTAL) {
+    console.log(
+      `Incremental mode: fetched from ${formatDate(FETCH_START)}, recalculated weeks from ${formatDate(OUTPUT_START)}.`
+    );
+  }
   if (SQLITE_ENABLED) {
     console.log(`SQLite cache: ${SQLITE_PATH}`);
   } else {
@@ -368,6 +392,59 @@ function buildWeeklyRegimes(series) {
   }));
 
   return { rows: market.rows, assetRegimes, assets };
+}
+
+function mergeIncrementalPayload(previous, next) {
+  const replaceFrom = next.regimes[0]?.weekEnd;
+  if (!replaceFrom) {
+    return previous;
+  }
+
+  const regimes = [...(previous.regimes || []).filter((row) => row.weekEnd >= formatDate(FULL_OUTPUT_START) && row.weekEnd < replaceFrom), ...next.regimes]
+    .sort((a, b) => parseDate(a.weekEnd) - parseDate(b.weekEnd));
+  const previousAssets = new Map((previous.assetRegimes || []).map((asset) => [asset.symbol, asset]));
+  const nextAssets = new Map((next.assetRegimes || []).map((asset) => [asset.symbol, asset]));
+  const assetSymbols = [...new Set([...previousAssets.keys(), ...nextAssets.keys()])];
+  const assetRegimes = assetSymbols
+    .map((symbol) => {
+      const previousAsset = previousAssets.get(symbol);
+      const nextAsset = nextAssets.get(symbol);
+      if (!nextAsset) {
+        return previousAsset
+          ? {
+              ...previousAsset,
+              regimes: previousAsset.regimes.filter((row) => row.weekEnd >= formatDate(FULL_OUTPUT_START))
+            }
+          : null;
+      }
+
+      return {
+        ...previousAsset,
+        ...nextAsset,
+        regimes: [
+          ...(previousAsset?.regimes || []).filter((row) => row.weekEnd >= formatDate(FULL_OUTPUT_START) && row.weekEnd < replaceFrom),
+          ...(nextAsset.regimes || [])
+        ].sort((a, b) => parseDate(a.weekEnd) - parseDate(b.weekEnd))
+      };
+    })
+    .filter(Boolean);
+
+  const assets = next.assets?.length ? next.assets : previous.assets || [];
+  return {
+    ...next,
+    metadata: {
+      ...next.metadata,
+      requestedStart: formatDate(FULL_OUTPUT_START),
+      dataThrough: regimes.at(-1)?.weekEnd || next.metadata.dataThrough
+    },
+    assets,
+    assetRegimes,
+    regimes,
+    summary: {
+      ...summarize(regimes),
+      assets: summarizeAssets(assetRegimes, regimes)
+    }
+  };
 }
 
 function hasSufficientAssetHistory(proxy, rows) {
@@ -983,9 +1060,22 @@ function addYears(date, years) {
   return next;
 }
 
+function maxDate(a, b) {
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
 function startOfWeek(date) {
   const day = date.getUTCDay() || 7;
   return addDays(date, 1 - day);
+}
+
+function readPreviousPayload(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    return null;
+  }
 }
 
 function initCache() {

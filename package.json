@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "npm run update:data && next build",
+    "build:static": "next build",
     "deploy:cloudflare": "npm run build && wrangler pages deploy out --project-name regimealpha --branch main",
+    "deploy:worker": "wrangler deploy --config wrangler.regime-updater.jsonc",
     "start": "next start",
     "update:data": "node scripts/build-regimes.mjs",
+    "update:data:incremental": "REGIME_INCREMENTAL=1 node scripts/build-regimes.mjs",
     "update:data:refresh": "REGIME_REFRESH=1 node scripts/build-regimes.mjs"
   },
   "dependencies": {
