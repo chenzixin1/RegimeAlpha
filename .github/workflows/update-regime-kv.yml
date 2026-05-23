@@ -37,7 +37,7 @@ jobs:
 
       - name: Capture previous data date
         id: before
-        run: echo "date=$(node -p \"require('./data/regimes.json').metadata.dataThrough\")" >> "$GITHUB_OUTPUT"
+        run: node -e "const d = require('./data/regimes.json'); console.log('date=' + d.metadata.dataThrough)" >> "$GITHUB_OUTPUT"
 
       - name: Refresh data
         id: refresh
@@ -51,7 +51,7 @@ jobs:
 
       - name: Capture refreshed data date
         id: after
-        run: echo "date=$(node -p \"require('./data/regimes.json').metadata.dataThrough\")" >> "$GITHUB_OUTPUT"
+        run: node -e "const d = require('./data/regimes.json'); console.log('date=' + d.metadata.dataThrough)" >> "$GITHUB_OUTPUT"
 
       - name: Publish JSON to Cloudflare Worker KV
         run: |
