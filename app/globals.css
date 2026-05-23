@@ -1233,7 +1233,7 @@ tbody tr:hover,
   box-shadow: 0 26px 70px rgba(22, 26, 29, 0.22);
   display: grid;
   gap: 10px;
-  inline-size: min(430px, calc(100vw - 24px));
+  inline-size: min(520px, calc(100vw - 24px));
   max-height: min(720px, calc(100vh - 96px));
   overflow: hidden;
   padding: 12px;
@@ -1299,7 +1299,41 @@ tbody tr:hover,
   border-radius: 7px;
   line-height: 1.55;
   padding: 10px 11px;
-  white-space: pre-wrap;
+  white-space: normal;
+}
+
+.chat-message p,
+.chat-message ul {
+  margin: 0;
+}
+
+.chat-message p + p,
+.chat-message p + ul,
+.chat-message ul + p,
+.chat-message ul + ul,
+.chat-message .chat-subhead + p,
+.chat-message .chat-subhead + ul {
+  margin-top: 8px;
+}
+
+.chat-message ul {
+  display: grid;
+  gap: 5px;
+  padding-left: 18px;
+}
+
+.chat-message li {
+  padding-left: 2px;
+}
+
+.chat-message strong {
+  font-weight: 800;
+}
+
+.chat-subhead {
+  display: block;
+  font-size: 0.95rem;
+  margin: 0;
 }
 
 .chat-message.assistant {

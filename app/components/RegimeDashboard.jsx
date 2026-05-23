@@ -687,10 +687,14 @@ export default function RegimeDashboard({ initialData }) {
           <div className="chat-messages">
             {chatMessages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
-                {message.content}
+                <ChatContent content={message.content} />
               </div>
             ))}
-            {chatLoading ? <div className="chat-message assistant">正在结合文章和数据分析...</div> : null}
+            {chatLoading ? (
+              <div className="chat-message assistant">
+                <ChatContent content="正在结合文章和数据分析..." />
+              </div>
+            ) : null}
             {chatError ? <div className="chat-error">{chatError}</div> : null}
           </div>
           <form
@@ -714,6 +718,57 @@ export default function RegimeDashboard({ initialData }) {
       ) : null}
     </div>
   );
+}
+
+function ChatContent({ content }) {
+  const blocks = String(content || "")
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) return null;
+
+  return blocks.map((block, blockIndex) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const isList = lines.length > 1 && lines.every((line) => /^([-*]|\d+\.)\s+/.test(line));
+    if (isList) {
+      return (
+        <ul key={`block-${blockIndex}`}>
+          {lines.map((line, lineIndex) => (
+            <li key={`line-${lineIndex}`}>
+              <InlineText text={line.replace(/^([-*]|\d+\.)\s+/, "")} />
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    const headingMatch = block.match(/^#{1,3}\s+(.+)$/);
+    if (headingMatch) {
+      return (
+        <strong key={`block-${blockIndex}`} className="chat-subhead">
+          <InlineText text={headingMatch[1]} />
+        </strong>
+      );
+    }
+
+    return (
+      <p key={`block-${blockIndex}`}>
+        <InlineText text={block.replace(/\n/g, " ")} />
+      </p>
+    );
+  });
+}
+
+function InlineText({ text }) {
+  const parts = String(text || "").split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
 }
 
 function PanelTitle({ title, meta }) {
