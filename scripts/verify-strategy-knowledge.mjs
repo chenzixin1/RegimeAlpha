@@ -8,6 +8,11 @@ import {
   SUPPORTED_INSTRUMENTS,
   SUPPORTED_REGIMES
 } from "../workers/strategy-knowledge.js";
+import {
+  getArticlePage,
+  getRelevantArticleContext,
+  listArticleChunks
+} from "../workers/article-context-utils.js";
 
 const requiredRisks = [
   "variance_drain",
@@ -60,5 +65,22 @@ assert(CORE_PRINCIPLES.length >= 7, "Expected at least seven core principles");
 assert(GUARDRAILS.notInvestmentAdvice === true, "Guardrails must mark notInvestmentAdvice");
 assert(GUARDRAILS.scope === "research_framework", "Guardrails must use research_framework scope");
 assert(GUARDRAILS.disallowedLanguage.includes("direct buy/sell instructions"), "Guardrails must block direct trading instructions");
+
+const chunks = listArticleChunks();
+assert(chunks.length > 10, "Expected article chunks");
+assert(chunks[0].id === "article-chunk-001", "Expected stable first chunk id");
+
+const firstPage = getArticlePage({ articleLimit: 5 });
+assert(firstPage.chunks.length === 5, "Expected first article page limit");
+assert(firstPage.cursor === "5", "Expected cursor offset 5");
+assert(firstPage.hasMore === true, "Expected first page to have more chunks");
+
+const relevant = getRelevantArticleContext({
+  query: "options volatility sideways",
+  riskTags: ["theta_decay", "vol_crush"],
+  articleLimit: 3
+});
+assert(relevant.chunks.length > 0, "Expected relevant article chunks");
+assert(relevant.mode === "relevant_chunks", "Expected relevant chunk mode");
 
 console.log("strategy knowledge coverage ok");
