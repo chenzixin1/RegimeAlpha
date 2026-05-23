@@ -160,6 +160,13 @@ const REGIME_EXPLAINERS = {
   }
 };
 
+const ARTICLE_PDF_PATH = "/articles/market-regime-transition-probability-study.pdf";
+const CHAT_SUGGESTIONS = [
+  "用原文 TVTP 框架解释现在为什么是牛市低波",
+  "SOX/DRAM/BTC 的 regime 和大盘有什么分化？",
+  "现在哪些指标最可能提示 regime 切换？"
+];
+
 export default function RegimeDashboard({ initialData }) {
   const [data, setData] = useState(initialData);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
@@ -169,6 +176,16 @@ export default function RegimeDashboard({ initialData }) {
   const [family, setFamily] = useState("all");
   const [query, setQuery] = useState("");
   const [heatmapTooltip, setHeatmapTooltip] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([
+    {
+      role: "assistant",
+      content: "我可以结合原始文章和当前 RegimeAlpha 数据，解释 regime、指标、板块分化和潜在切换信号。"
+    }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -286,6 +303,40 @@ export default function RegimeDashboard({ initialData }) {
   };
   const moveHeatmapTooltip = (row, event) => showHeatmapTooltip(row, event);
   const hideHeatmapTooltip = () => setHeatmapTooltip(null);
+  const askChat = async (preset) => {
+    const content = (preset || chatInput).trim();
+    if (!content || chatLoading) return;
+
+    const nextMessages = [...chatMessages, { role: "user", content }];
+    setChatMessages(nextMessages);
+    setChatInput("");
+    setChatError(null);
+    setChatLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: nextMessages,
+          context: {
+            selectedWeek: selected.weekEnd,
+            selectedAssetSymbol,
+            heatmapKey
+          }
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || `Chat API ${response.status}`);
+      }
+      setChatMessages((messages) => [...messages, { role: "assistant", content: payload.answer }]);
+    } catch (error) {
+      setChatError(error.message || "研究助手暂时不可用。");
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -316,6 +367,22 @@ export default function RegimeDashboard({ initialData }) {
             <Metric label="SPY 13W" value={formatPercent(latest.metrics.ret13w)} tone={tone(latest.metrics.ret13w)} />
             <Metric label="VIX" value={number(latest.metrics.vixClose, 1)} />
             <Metric label="Confidence" value={formatPercent(latest.confidence)} />
+          </div>
+        </section>
+
+        <section className="source-panel">
+          <div>
+            <p className="eyebrow">Source Article</p>
+            <h3>Empirical Dynamics of Market Regime Transitions</h3>
+            <p>原始 PDF 已作为研究资料挂载；右下角研究助手会同时读取文章摘录和当前最新数据。</p>
+          </div>
+          <div className="source-actions">
+            <a href={ARTICLE_PDF_PATH} target="_blank" rel="noreferrer">
+              打开原始 PDF
+            </a>
+            <button type="button" onClick={() => setChatOpen(true)}>
+              询问研究助手
+            </button>
           </div>
         </section>
 
@@ -596,6 +663,55 @@ export default function RegimeDashboard({ initialData }) {
           </div>
         </section>
       </main>
+      <button type="button" className="chat-launcher" onClick={() => setChatOpen((value) => !value)}>
+        研究助手
+      </button>
+      {chatOpen ? (
+        <section className="chat-panel" aria-label="RegimeAlpha research assistant">
+          <div className="chat-head">
+            <div>
+              <span>Gemini 3.5 Flash</span>
+              <strong>文章 + 当前数据</strong>
+            </div>
+            <button type="button" onClick={() => setChatOpen(false)} aria-label="Close assistant">
+              ×
+            </button>
+          </div>
+          <div className="chat-suggestions">
+            {CHAT_SUGGESTIONS.map((suggestion) => (
+              <button key={suggestion} type="button" onClick={() => askChat(suggestion)} disabled={chatLoading}>
+                {suggestion}
+              </button>
+            ))}
+          </div>
+          <div className="chat-messages">
+            {chatMessages.map((message, index) => (
+              <div key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
+                {message.content}
+              </div>
+            ))}
+            {chatLoading ? <div className="chat-message assistant">正在结合文章和数据分析...</div> : null}
+            {chatError ? <div className="chat-error">{chatError}</div> : null}
+          </div>
+          <form
+            className="chat-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              askChat();
+            }}
+          >
+            <textarea
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="问一个关于 regime、原文框架或板块分化的问题"
+              rows={3}
+            />
+            <button type="submit" disabled={chatLoading || !chatInput.trim()}>
+              发送
+            </button>
+          </form>
+        </section>
+      ) : null}
     </div>
   );
 }

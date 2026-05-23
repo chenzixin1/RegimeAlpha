@@ -54,6 +54,14 @@ GitHub Actions 需要两个 repository secret：
 
 日常自动任务使用 `npm run update:data:incremental`，默认只重算最近约 120 天的周度输出，并为 52 周回撤、200 日均线、相关性等指标向前补取约 460 天上下文；`npm run update:data` 仍保留为全量 5 年兜底重建。
 
+## 原文 PDF 与研究助手
+
+首页包含原始文章 PDF 入口：`/articles/market-regime-transition-probability-study.pdf`。右下角的研究助手通过 Cloudflare Pages Function `/api/chat` 调用 OpenRouter `google/gemini-3.5-flash`，结合原文摘录和 `/data/regimes.json` 最新数据回答问题。
+
+Pages 生产环境需要配置：
+
+- `OPENROUTER_API_KEY`：OpenRouter 调用密钥。
+
 ## Vercel 口径
 
 当前设计对 Vercel 友好：构建阶段运行 `npm run update:data`，运行时页面读取随部署产物一起发布的 JSON。Vercel Serverless 文件系统不适合持久写入 SQLite；如果后续要做线上定时刷新，应把缓存适配层替换为 Vercel KV/Postgres 或 Turso/libSQL，并把 `FMP_API_KEY` 配到 Vercel 环境变量。
