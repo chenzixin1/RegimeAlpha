@@ -386,6 +386,31 @@ export default function RegimeDashboard({ initialData }) {
           </div>
         </section>
 
+        <section className="mcp-panel">
+          <div>
+            <p className="eyebrow">Agent Access</p>
+            <h3>数据接口 / MCP</h3>
+            <p>其他 agent 可以直接读取 RegimeAlpha 的市场数据、文章策略知识和持仓风险映射。</p>
+          </div>
+          <div className="endpoint-list">
+            <div>
+              <span>JSON API</span>
+              <code>https://regimealpha.chenzixin.uk/api/export</code>
+            </div>
+            <div>
+              <span>MCP endpoint</span>
+              <code>https://regimealpha.chenzixin.uk/mcp</code>
+            </div>
+            <div>
+              <span>Local proxy</span>
+              <code>npx mcp-remote https://regimealpha.chenzixin.uk/mcp</code>
+            </div>
+          </div>
+          <p className="mcp-note">
+            MCP tools include live regime data, strategy playbooks, instrument guidance, position risk mapping, and optional article chunks.
+          </p>
+        </section>
+
         <section className="controls-panel">
           <div className="segmented" aria-label="Regime family filter">
             {Object.entries(FAMILY_LABELS).map(([key, label]) => (

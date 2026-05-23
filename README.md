@@ -77,12 +77,28 @@ curl "https://regimealpha.chenzixin.uk/api/export?symbol=DRAM&limit=8"
 curl "https://regimealpha.chenzixin.uk/api/export?symbol=SOX&weekEnd=2026-05-22"
 ```
 
-MCP 由 `regimealpha-mcp` Worker 提供，使用 Cloudflare Agents SDK 的 `createMcpHandler()` 实现无状态远程 MCP。它暴露四个工具：
+MCP 由 `regimealpha-mcp` Worker 提供，使用 Cloudflare Agents SDK 的 `createMcpHandler()` 实现无状态远程 MCP。本地代理：
+
+```bash
+npx mcp-remote https://regimealpha.chenzixin.uk/mcp
+REGIME_MCP_URL=https://regimealpha.chenzixin.uk/mcp npm run verify:mcp-strategy
+```
+
+数据工具：
 
 - `get_latest_regime`：返回最新大盘 regime 和资产快照。
 - `get_asset_regime`：查询单个标的的当前或指定周 regime。
 - `compare_assets`：比较多个标的在同一周的 regime 和关键指标。
 - `list_regime_weeks`：列出近期周度 market regime，可附带一个资产序列。
+
+策略与文章工具：
+
+- `get_strategy_playbook`：按 regime、工具、风险或关键词返回结构化策略知识，可选原文片段或分页全文。
+- `get_regime_strategy`：查询某个 regime 的策略框架、风险、转换信号和适配工具。
+- `get_instrument_guidance`：查询股票、ETF、LETF、期权、OTM 期权、价差、对冲、现金等工具在不同 regime 下的适配。
+- `map_position_to_regime_risks`：把持仓描述映射到当前 regime、风险标签和缺失输入，用于后续组合分析。
+- `search_article_context`：按关键词搜索 PDF 提炼出的文章片段。
+- `get_article_chunks`：分页返回完整文章内容，供高上下文 agent 使用。
 
 常用部署命令：
 
