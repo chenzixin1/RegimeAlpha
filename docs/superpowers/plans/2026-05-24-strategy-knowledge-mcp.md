@@ -575,11 +575,12 @@ console.log(tools.tools.map((tool) => tool.name).join(','));
 const result = await client.callTool({ name: 'get_asset_regime', arguments: { symbol: 'DRAM', historyWeeks: 2 } });
 const payload = JSON.parse(result.content[0].text);
 console.log(payload.asset.displaySymbol, payload.selected.labelZh);
+if (!payload.selected?.code || !payload.selected?.labelZh) throw new Error('Expected selected regime');
 await client.close();
 NODE
 ```
 
-Expected output includes existing tools and `DRAM 震荡高波`.
+Expected output includes existing tools and a DRAM selected regime. Do not require a fixed live label because production data changes over time.
 
 - [ ] **Step 5: Commit**
 
@@ -649,7 +650,11 @@ assert(JSON.stringify(instrumentPayload).includes("theta"), "Expected theta guid
 const positionResult = await client.callTool({
   name: "map_position_to_regime_risks",
   arguments: {
-    positions: [{ symbol: "DRAM", instrument: "otm_options", side: "long", expiry: "2026-09-18" }],
+    positions: [
+      { symbol: "DRAM", instrument: "otm_options", side: "long", expiry: "2026-09-18" },
+      { symbol: "SOX", instrument: "long_equity", side: "long" },
+      { symbol: "BTC", instrument: "etf", side: "long" }
+    ],
     useCurrentRegimeData: true
   }
 });
@@ -657,6 +662,22 @@ const positionPayload = JSON.parse(positionResult.content[0].text);
 assert(positionPayload.positions[0].symbol === "DRAM", "Expected DRAM position");
 assert(positionPayload.positions[0].currentRegime?.labelZh, "Expected current regime data");
 assert(positionPayload.positions[0].riskTags.length > 0, "Expected risk tags");
+assert(positionPayload.positions[0].missingInputs.requiredForSpecificAssessment.includes("strike"), "Expected strike missing input");
+assert(positionPayload.positions[0].missingInputs.usefulForSizing.includes("position size"), "Expected position size missing input");
+assert(positionPayload.positions[0].missingInputs.optionalContext.includes("portfolio concentration"), "Expected optional context missing input");
+assert(positionPayload.positions[1].normalizedSymbol === "SOXX", "Expected SOX to normalize to SOXX");
+assert(positionPayload.positions[2].normalizedSymbol === "BTCUSD", "Expected BTC to normalize to BTCUSD");
+
+const fallbackResult = await client.callTool({
+  name: "map_position_to_regime_risks",
+  arguments: {
+    defaultRegime: "sideways_volatile",
+    positions: [{ symbol: "UNKNOWN", instrument: "otm_options", side: "long" }],
+    useCurrentRegimeData: true
+  }
+});
+const fallbackPayload = JSON.parse(fallbackResult.content[0].text);
+assert(fallbackPayload.positions[0].regimeSource === "defaultRegime", "Expected defaultRegime fallback");
 
 const articleResult = await client.callTool({
   name: "get_article_chunks",
@@ -665,6 +686,15 @@ const articleResult = await client.callTool({
 const articlePayload = JSON.parse(articleResult.content[0].text);
 assert(articlePayload.chunks.length === 3, "Expected article pagination");
 assert(articlePayload.cursor === "3", "Expected next cursor");
+
+const emptyResult = await client.callTool({
+  name: "get_strategy_playbook",
+  arguments: { regime: "not_a_regime", instrument: "not_an_instrument" }
+});
+const emptyPayload = JSON.parse(emptyResult.content[0].text);
+assert(emptyPayload.validOptions.regimes.length > 0, "Expected valid regime options");
+assert(emptyPayload.validOptions.instruments.length > 0, "Expected valid instrument options");
+assert(emptyPayload.suggestions.length > 0, "Expected broader query suggestions");
 
 await client.close();
 console.log(`strategy MCP verification ok: ${endpoint}`);
@@ -784,7 +814,40 @@ Then implement the remaining five tools:
     2. else use `position.regime`.
     3. else use `defaultRegime`.
     4. else return missing input `regime`.
+  - Normalize holding symbols through the shared `normalizeSymbol()` helper:
+    - `SOX` -> `SOXX`
+    - `BTC` -> `BTCUSD`
+    - otherwise uppercase trimmed symbol.
+  - Include both original `symbol` and `normalizedSymbol` in each position result.
   - Return per-position risk tags, matched strategies, missing inputs, current regime data if available.
+  - Missing inputs must be grouped exactly as:
+
+```js
+{
+  requiredForSpecificAssessment: ["strike", "moneyness", "implied volatility or IV rank"],
+  usefulForSizing: ["position size", "cost basis"],
+  optionalContext: ["portfolio concentration", "hedge relationship"]
+}
+```
+
+  - Build this classification from instrument type. For `otm_options`, `strike`, `moneyness`, and `implied volatility or IV rank` are required if absent; `position size` and `cost basis` are useful for sizing if absent; `portfolio concentration` and `hedge relationship` are optional context.
+
+- Error/no-match behavior:
+  - `get_strategy_playbook` should not throw for invalid filters. Return empty `matchedStrategies` plus:
+
+```js
+{
+  validOptions: { regimes: SUPPORTED_REGIMES, instruments: SUPPORTED_INSTRUMENTS },
+  suggestions: [
+    "Remove one or more filters and retry.",
+    "Use get_regime_strategy for a known regime.",
+    "Use get_instrument_guidance for a known instrument."
+  ]
+}
+```
+
+  - `get_regime_strategy` and `get_instrument_guidance` may use `errorResult` for invalid required arguments, but the error text must include valid options.
+  - `map_position_to_regime_risks` should return per-position errors for invalid `position.regime` or `position.instrument`, not fail the whole tool call.
 
 - `search_article_context`
   - Inputs: `query`, `articleLimit`.
