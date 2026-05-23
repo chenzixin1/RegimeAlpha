@@ -652,7 +652,7 @@ const positionResult = await client.callTool({
   name: "map_position_to_regime_risks",
   arguments: {
     positions: [
-      { symbol: "DRAM", instrument: "otm_options", side: "long", expiry: "2026-09-18" },
+      { symbol: "DRAM", instrument: "otm_options", side: "long" },
       { symbol: "SOX", instrument: "long_equity", side: "long" },
       { symbol: "BTC", instrument: "etf", side: "long" }
     ],
@@ -707,6 +707,14 @@ const invalidPositionResult = await client.callTool({
 });
 const invalidPositionPayload = JSON.parse(invalidPositionResult.content[0].text);
 assert(invalidPositionPayload.positions[0].errors.length >= 2, "Expected per-position invalid regime and instrument errors");
+
+const regimeWithInstrumentsResult = await client.callTool({
+  name: "get_regime_strategy",
+  arguments: { regime: "sideways_volatile", includeInstruments: true }
+});
+const regimeWithInstrumentsPayload = JSON.parse(regimeWithInstrumentsResult.content[0].text);
+assert(regimeWithInstrumentsPayload.bestFitInstruments.length > 0, "Expected best-fit instruments");
+assert(regimeWithInstrumentsPayload.avoidInstruments.length > 0, "Expected avoid instruments");
 
 const articleResult = await client.callTool({
   name: "get_article_chunks",
@@ -826,8 +834,23 @@ Then implement the remaining five tools:
 
 - `get_regime_strategy`
   - Validate regime against `SUPPORTED_REGIMES`.
+  - Schema includes `includeInstruments: z.boolean().default(false)`.
   - Return valid options via `errorResult` if invalid.
   - Return matching strategies, risk rules, transition signals, optional relevant article context.
+  - If `includeInstruments=true`, add:
+
+```js
+{
+  bestFitInstruments: INSTRUMENT_GUIDANCE.filter(
+    (entry) => entry.regimes?.includes(regime) && entry.fit !== "avoid"
+  ),
+  avoidInstruments: INSTRUMENT_GUIDANCE.filter(
+    (entry) => entry.regimes?.includes(regime) && entry.fit === "avoid"
+  )
+}
+```
+
+  - If no instrument guidance rows declare `fit`, infer best-fit and avoid lists from `STRATEGY_ENTRIES[*].appliesTo.instruments`, `useWhen`, and `avoidWhen`, but always return both arrays.
 
 - `get_instrument_guidance`
   - Validate instrument against `SUPPORTED_INSTRUMENTS`.

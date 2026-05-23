@@ -227,7 +227,7 @@ Article payload:
 }
 ```
 
-For `full_article`, use `cursor` and `limit` with a conservative maximum so agents can pull the full text iteratively.
+For `full_article`, use `cursor` and `articleLimit` with a conservative maximum so agents can pull the full text iteratively.
 
 ## MCP Tool Design
 
@@ -345,7 +345,7 @@ Purpose: Search PDF chunks directly.
 Inputs:
 
 - `query: string`
-- `limit?: number`
+- `articleLimit?: number`
 
 Output:
 
@@ -359,7 +359,7 @@ Purpose: Paginate through complete article content for high-context agents.
 Inputs:
 
 - `cursor?: string`
-- `limit?: number`
+- `articleLimit?: number`
 
 Output:
 
