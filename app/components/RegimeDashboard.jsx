@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COLORS = {
   bull_quiet: "#2e9d68",
@@ -23,6 +23,19 @@ const FAMILY_LABELS = {
   special: "特殊"
 };
 
+const REGIME_LABELS_ZH = {
+  bull_quiet: "牛市低波",
+  bull_volatile: "牛市高波",
+  bear_quiet: "熊市低波",
+  bear_volatile: "熊市高波",
+  sideways_quiet: "震荡低波",
+  sideways_volatile: "震荡高波",
+  trend_accelerating: "趋势加速",
+  mean_reverting: "均值回归",
+  stagflationary: "滞胀冲击",
+  microstructure_dislocation: "微观结构错位"
+};
+
 const METRIC_EXPLANATIONS = {
   Week: {
     title: "周结束日",
@@ -39,6 +52,10 @@ const METRIC_EXPLANATIONS = {
   Confidence: {
     title: "模型置信度",
     body: "规则分类器对当前 regime 标签的相对把握程度。越高表示当前指标组合越集中地支持这个标签。"
+  },
+  "Switch Risk": {
+    title: "Regime 切换风险",
+    body: "TVTP proxy 对当前周从 baseline regime 转向其他 regime 的压力估计，结合周跌幅、放量下跌、VIX、趋势效率和均线破位。"
   },
   "1W": {
     title: "近 1 周收益",
@@ -160,7 +177,16 @@ const REGIME_EXPLAINERS = {
   }
 };
 
+const ARTICLE_PDF_PATH = "/articles/market-regime-transition-probability-study.pdf";
+const ARTICLE_TRANSLATION_PATH = "/articles/market-regime-transition-probability-study.zh.md";
+const CHAT_SUGGESTIONS = [
+  "用原文 TVTP 框架解释现在为什么是牛市高波",
+  "SOX/DRAM/BTC/EWY 的 regime 和大盘有什么分化？",
+  "现在哪些指标最可能提示 regime 切换？"
+];
+
 export default function RegimeDashboard({ initialData }) {
+  const [data, setData] = useState(initialData);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
   const [selectedAssetSymbol, setSelectedAssetSymbol] = useState("SOXX");
   const [heatmapKey, setHeatmapKey] = useState("MARKET");
@@ -168,17 +194,50 @@ export default function RegimeDashboard({ initialData }) {
   const [family, setFamily] = useState("all");
   const [query, setQuery] = useState("");
   const [heatmapTooltip, setHeatmapTooltip] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState([
+    {
+      role: "assistant",
+      content: "我可以结合原始文章、MCP 策略知识和当前 RegimeAlpha 数据，解释 regime、指标、板块分化和潜在切换信号。"
+    }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState(null);
 
-  const rows = initialData.regimes;
-  const assetRegimes = initialData.assetRegimes || [];
-  const definitions = initialData.regimeDefinitions;
-  const latest = initialData.summary.latest;
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWorkerData() {
+      try {
+        const response = await fetch(`/data/regimes.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const nextData = await response.json();
+        if (!cancelled && nextData?.summary?.latest?.weekEnd) {
+          setData(nextData);
+        }
+      } catch {
+        // Keep static build-time data when the deployed JSON route is unavailable.
+      }
+    }
+    loadWorkerData();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows = data.regimes;
+  const assetRegimes = data.assetRegimes || [];
+  const definitions = data.regimeDefinitions;
+  const latest = data.summary.latest;
+  const previous = rows.at(-2) || null;
+  const weeklyChange = useMemo(() => buildWeeklyChangeSummary(latest, previous), [latest, previous]);
+  const weeklyCharts = useMemo(() => buildWeeklySummaryCharts(rows), [rows]);
   const selected = rows.find((row) => row.weekEnd === selectedWeek) || latest;
   const selectedAsset = assetRegimes.find((asset) => asset.symbol === selectedAssetSymbol) || assetRegimes[0];
   const selectedAssetRow = selectedAsset?.regimes.find((row) => row.weekEnd === selected.weekEnd) || selectedAsset?.regimes.at(-1);
   const detailIsAsset = Boolean(selectedAssetRow);
   const detailRow = selectedAssetRow || selected;
-  const detailStrategies = detailIsAsset ? initialData.strategyMap?.[detailRow.code] : selected.strategies;
+  const detailStrategies = detailIsAsset ? data.strategyMap?.[detailRow.code] : selected.strategies;
   const assetRowsForWeek = useMemo(
     () =>
       assetRegimes
@@ -223,6 +282,12 @@ export default function RegimeDashboard({ initialData }) {
   const heatmapRows = heatmapTab?.regimes || rows;
   const heatmapSelectedRow = heatmapRows.find((row) => row.weekEnd === selected.weekEnd) || heatmapRows.at(-1);
 
+  useEffect(() => {
+    if (!rows.some((row) => row.weekEnd === selectedWeek)) {
+      setSelectedWeek(latest.weekEnd);
+    }
+  }, [latest.weekEnd, rows, selectedWeek]);
+
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return rows.filter((row) => {
@@ -259,6 +324,40 @@ export default function RegimeDashboard({ initialData }) {
   };
   const moveHeatmapTooltip = (row, event) => showHeatmapTooltip(row, event);
   const hideHeatmapTooltip = () => setHeatmapTooltip(null);
+  const askChat = async (preset) => {
+    const content = (preset || chatInput).trim();
+    if (!content || chatLoading) return;
+
+    const nextMessages = [...chatMessages, { role: "user", content }];
+    setChatMessages(nextMessages);
+    setChatInput("");
+    setChatError(null);
+    setChatLoading(true);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: nextMessages,
+          context: {
+            selectedWeek: selected.weekEnd,
+            selectedAssetSymbol,
+            heatmapKey
+          }
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || `Chat API ${response.status}`);
+      }
+      setChatMessages((messages) => [...messages, { role: "assistant", content: payload.answer }]);
+    } catch (error) {
+      setChatError(error.message || "研究助手暂时不可用。");
+    } finally {
+      setChatLoading(false);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -269,27 +368,59 @@ export default function RegimeDashboard({ initialData }) {
         </div>
         <div className="freshness">
           <span>数据截至</span>
-          <strong>{initialData.metadata.dataThrough}</strong>
-          <span>生成于 {formatDateTime(initialData.metadata.generatedAt)}</span>
+          <strong>{data.metadata.dataThrough}</strong>
+          <span>生成于 {formatDateTime(data.metadata.generatedAt)}</span>
         </div>
       </header>
 
       <main className="dashboard">
-        <section className="latest-panel" style={{ "--accent": COLORS[latest.code] }}>
-          <div className="latest-copy">
-            <p className="eyebrow">Latest</p>
-            <h2>
-              <RegimeLogo code={latest.code} size={42} />
-              {latest.labelZh}
-            </h2>
-            <p>{latest.thesis}</p>
+        <WeeklySummary summary={weeklyChange} charts={weeklyCharts} latest={latest} previous={previous} />
+
+        <section className="source-panel">
+          <div>
+            <p className="eyebrow">Source Article</p>
+            <h3>Empirical Dynamics of Market Regime Transitions</h3>
+            <p>原始 PDF 已作为研究资料挂载；右下角研究助手会同时读取文章摘录和当前最新数据。</p>
           </div>
-          <div className="latest-metrics">
-            <Metric label="Week" value={latest.weekEnd} />
-            <Metric label="SPY 13W" value={formatPercent(latest.metrics.ret13w)} tone={tone(latest.metrics.ret13w)} />
-            <Metric label="VIX" value={number(latest.metrics.vixClose, 1)} />
-            <Metric label="Confidence" value={formatPercent(latest.confidence)} />
+          <div className="source-actions">
+            <a href={ARTICLE_PDF_PATH} download>
+              下载原始 PDF
+            </a>
+            <a href={ARTICLE_TRANSLATION_PATH} download>
+              下载中文摘译
+            </a>
+            <a href="/api/export" target="_blank" rel="noreferrer">
+              下载数据接口
+            </a>
+            <button type="button" onClick={() => setChatOpen(true)}>
+              询问研究助手
+            </button>
           </div>
+        </section>
+
+        <section className="mcp-panel">
+          <div>
+            <p className="eyebrow">Agent Access</p>
+            <h3>数据接口 / MCP</h3>
+            <p>其他 agent 可以直接读取 RegimeAlpha 的市场数据、文章策略知识和持仓风险映射。</p>
+          </div>
+          <div className="endpoint-list">
+            <div>
+              <span>JSON API</span>
+              <code>https://regimealpha.chenzixin.uk/api/export</code>
+            </div>
+            <div>
+              <span>MCP endpoint</span>
+              <code>https://regimealpha.chenzixin.uk/mcp</code>
+            </div>
+            <div>
+              <span>Local proxy</span>
+              <code>npx mcp-remote https://regimealpha.chenzixin.uk/mcp</code>
+            </div>
+          </div>
+          <p className="mcp-note">
+            MCP tools include live regime data, strategy playbooks, instrument guidance, position risk mapping, and optional article chunks.
+          </p>
         </section>
 
         <section className="controls-panel">
@@ -315,11 +446,11 @@ export default function RegimeDashboard({ initialData }) {
           <PanelTitle title="五年周度热力图" meta={`${heatmapTab.displaySymbol} · ${heatmapRows.length} weeks`} />
           <RegimeLegend
             definitions={definitions}
-            strategyMap={initialData.strategyMap}
+            strategyMap={data.strategyMap}
             activeCode={referenceCode}
             onSelect={setReferenceCode}
           />
-          <RegimeReference definitions={definitions} strategyMap={initialData.strategyMap} activeCode={referenceCode} />
+          <RegimeReference definitions={definitions} strategyMap={data.strategyMap} activeCode={referenceCode} />
           <div className="heatmap-tabs" aria-label="Heatmap data source">
             {heatmapTabs.map((tab) => {
               const rowForTab = tab.regimes.find((row) => row.weekEnd === selected.weekEnd) || tab.regimes.at(-1);
@@ -451,6 +582,7 @@ export default function RegimeDashboard({ initialData }) {
               <span key={driver}>{driver}</span>
             ))}
           </div>
+          <TransitionBlock row={detailRow} />
           <div className="metric-grid compact">
             {detailIsAsset ? (
               <>
@@ -525,6 +657,7 @@ export default function RegimeDashboard({ initialData }) {
                   <th>1W</th>
                   <th>13W</th>
                   <th>VIX</th>
+                  <th>Switch</th>
                   <th>20D Vol</th>
                   <th>Sector Corr</th>
                   <th>Confidence</th>
@@ -538,18 +671,19 @@ export default function RegimeDashboard({ initialData }) {
                       const igv = byAssetWeek.get("IGV")?.get(row.weekEnd);
                       return (
                         <>
-                    <td>{row.weekEnd}</td>
-                    <td>
-                      <RegimeChip code={row.code} label={row.labelZh} />
-                    </td>
-                    <td>{sox ? <RegimeChip code={sox.code} label={sox.labelZh} mini /> : "-"}</td>
-                    <td>{igv ? <RegimeChip code={igv.code} label={igv.labelZh} mini /> : "-"}</td>
-                    <td className={row.metrics.weeklyReturn >= 0 ? "good" : "bad"}>{formatPercent(row.metrics.weeklyReturn)}</td>
-                    <td className={row.metrics.ret13w >= 0 ? "good" : "bad"}>{formatPercent(row.metrics.ret13w)}</td>
-                    <td>{number(row.metrics.vixClose, 1)}</td>
-                    <td>{formatPercent(row.metrics.realizedVol20)}</td>
-                    <td>{number(row.metrics.sectorCorrelation20, 2)}</td>
-                    <td>{formatPercent(row.confidence)}</td>
+                          <td>{row.weekEnd}</td>
+                          <td>
+                            <RegimeChip code={row.code} label={row.labelZh} />
+                          </td>
+                          <td>{sox ? <RegimeChip code={sox.code} label={sox.labelZh} mini /> : "-"}</td>
+                          <td>{igv ? <RegimeChip code={igv.code} label={igv.labelZh} mini /> : "-"}</td>
+                          <td className={row.metrics.weeklyReturn >= 0 ? "good" : "bad"}>{formatPercent(row.metrics.weeklyReturn)}</td>
+                          <td className={row.metrics.ret13w >= 0 ? "good" : "bad"}>{formatPercent(row.metrics.ret13w)}</td>
+                          <td>{number(row.metrics.vixClose, 1)}</td>
+                          <td className={transitionTone(row.transition)}>{formatPressure(row.transition?.pressure)}</td>
+                          <td>{formatPercent(row.metrics.realizedVol20)}</td>
+                          <td>{number(row.metrics.sectorCorrelation20, 2)}</td>
+                          <td>{formatPercent(row.confidence)}</td>
                         </>
                       );
                     })()}
@@ -561,16 +695,318 @@ export default function RegimeDashboard({ initialData }) {
         </section>
 
         <section className="method-panel">
-          <PanelTitle title="模型口径" meta={initialData.metadata.model} />
+          <PanelTitle title="模型口径" meta={data.metadata.model} />
           <div className="method-grid">
-            {initialData.metadata.methodology.map((item) => (
+            {data.metadata.methodology.map((item) => (
               <p key={item}>{item}</p>
             ))}
           </div>
         </section>
       </main>
+      <button type="button" className="chat-launcher" onClick={() => setChatOpen((value) => !value)}>
+        研究助手
+      </button>
+      {chatOpen ? (
+        <section className="chat-panel" aria-label="RegimeAlpha research assistant">
+          <div className="chat-head">
+            <div>
+              <span>OpenRouter Research</span>
+              <strong>文章 + 当前数据</strong>
+            </div>
+            <div className="chat-head-actions">
+              <button type="button" onClick={() => downloadChatTranscript(chatMessages)}>
+                下载聊天记录
+              </button>
+              <button type="button" onClick={() => setChatOpen(false)} aria-label="Close assistant">
+                ×
+              </button>
+            </div>
+          </div>
+          <div className="chat-suggestions">
+            {CHAT_SUGGESTIONS.map((suggestion) => (
+              <button key={suggestion} type="button" onClick={() => askChat(suggestion)} disabled={chatLoading}>
+                {suggestion}
+              </button>
+            ))}
+          </div>
+          <div className="chat-messages">
+            {chatMessages.map((message, index) => (
+              <div key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
+                <ChatContent content={message.content} />
+              </div>
+            ))}
+            {chatLoading ? (
+              <div className="chat-message assistant">
+                <ChatContent content="正在结合文章和数据分析..." />
+              </div>
+            ) : null}
+            {chatError ? <div className="chat-error">{chatError}</div> : null}
+          </div>
+          <form
+            className="chat-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              askChat();
+            }}
+          >
+            <textarea
+              value={chatInput}
+              onChange={(event) => setChatInput(event.target.value)}
+              placeholder="问一个关于 regime、原文框架或板块分化的问题"
+              rows={3}
+            />
+            <button type="submit" disabled={chatLoading || !chatInput.trim()}>
+              发送
+            </button>
+          </form>
+        </section>
+      ) : null}
     </div>
   );
+}
+
+function WeeklySummary({ summary, charts, latest, previous }) {
+  const chartItems = summary.items.filter((item) => item.chartKey);
+  return (
+    <section className="weekly-summary-panel" aria-label="Weekly market overview" style={{ "--accent": COLORS[latest.code] }}>
+      <div className="summary-overview-row">
+        <div className={`summary-latest-card ${summary.widgets.regime ? "changed-widget" : ""}`}>
+          <p className="eyebrow">Latest Regime</p>
+          <h2>
+            <RegimeLogo code={latest.code} size={42} />
+            {latest.labelZh}
+          </h2>
+          <p>{latest.thesis}</p>
+          {summary.widgets.regime ? <small className="widget-change-note">{summary.widgets.regime}</small> : null}
+        </div>
+        <div className="summary-copy">
+          <p className="eyebrow">Weekly Summary</p>
+          <h3>{summary.headline}</h3>
+          <p>{summary.body}</p>
+        </div>
+      </div>
+      <div className="summary-metrics-strip">
+        <Metric label="Week" value={latest.weekEnd} />
+        <Metric label="SPY 13W" value={formatPercent(latest.metrics.ret13w)} tone={tone(latest.metrics.ret13w)} change={summary.widgets.spy13w} />
+        <Metric label="VIX" value={number(latest.metrics.vixClose, 1)} change={summary.widgets.vix} />
+        <Metric label="Confidence" value={formatPercent(latest.confidence)} change={summary.widgets.confidence} />
+        <Metric label="Switch Risk" value={formatPressure(latest.transition?.pressure)} tone={transitionTone(latest.transition)} change={summary.widgets.switchRisk} />
+      </div>
+      <div className="summary-change-grid">
+        {chartItems.map((item) => (
+          <div key={item.label} className={`summary-change-card ${item.changed ? "changed-widget" : ""}`}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+            <small>{item.note}</small>
+            {charts[item.chartKey] ? <MicroChart config={charts[item.chartKey]} /> : null}
+          </div>
+        ))}
+      </div>
+      <span className="chart-attribution">Inline SVG charts render at first paint</span>
+      <TransitionBlock row={latest} compact />
+      {previous ? (
+        <p className="summary-footnote">
+          Compared with {previous.weekEnd}. Amber marks widgets whose state changed materially.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function MicroChart({ config }) {
+  return (
+    <div className={`micro-chart ${config.kind}`} aria-label={config.label}>
+      <svg className="micro-chart-canvas" viewBox="0 0 260 128" role="img" aria-label={config.label} preserveAspectRatio="none">
+        {renderMicroChart(config)}
+      </svg>
+      <em>{config.caption}</em>
+    </div>
+  );
+}
+
+function renderMicroChart(config) {
+  if (config.kind === "candlestick") {
+    return <MicroCandlesticks data={config.data} />;
+  }
+  if (config.kind === "histogram") {
+    return <MicroHistogram data={config.data} yMin={config.yMin} />;
+  }
+  return <MicroLine data={config.data} highlightLast={config.highlightLast} yMax={config.yMax} yMin={config.yMin} />;
+}
+
+function MicroLine({ data, highlightLast, yMax, yMin }) {
+  const points = scaleLinePoints(data, { yMax, yMin });
+  if (points.length < 2) return null;
+  const historyPath = pointsToPath(points);
+  const lastPath = pointsToPath(points.slice(-2));
+  return (
+    <>
+      <MicroAxis />
+      <path className={highlightLast ? "micro-line muted" : "micro-line"} d={historyPath} />
+      {highlightLast ? <path className="micro-line highlight" d={lastPath} /> : null}
+      {highlightLast
+        ? points.slice(-2).map((point) => <circle className="micro-point" cx={point.x} cy={point.y} key={`${point.x}-${point.y}`} r="3.2" />)
+        : null}
+    </>
+  );
+}
+
+function MicroCandlesticks({ data }) {
+  const values = data.flatMap((point) => [point.low, point.high]).filter(Number.isFinite);
+  if (!values.length) return null;
+  const { x, y } = chartScales(data.length, Math.min(...values), Math.max(...values));
+  const bodyWidth = Math.max(5, Math.min(12, 180 / Math.max(1, data.length)));
+  return (
+    <>
+      <MicroAxis />
+      {data.map((point, index) => {
+        const cx = x(index);
+        const openY = y(point.open);
+        const closeY = y(point.close);
+        const highY = y(point.high);
+        const lowY = y(point.low);
+        const up = point.close >= point.open;
+        const top = Math.min(openY, closeY);
+        const bodyHeight = Math.max(3, Math.abs(closeY - openY));
+        return (
+          <g className={up ? "micro-candle up" : "micro-candle down"} key={point.time}>
+            <line x1={cx} x2={cx} y1={highY} y2={lowY} />
+            <rect height={bodyHeight} rx="1.4" width={bodyWidth} x={cx - bodyWidth / 2} y={top} />
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
+function MicroHistogram({ data, yMin = 0 }) {
+  const values = data.map((point) => point.value).filter(Number.isFinite);
+  if (!values.length) return null;
+  const { x, y, bottom } = chartScales(data.length, yMin, Math.max(...values, yMin + 1));
+  const barWidth = Math.max(5, Math.min(13, 180 / Math.max(1, data.length)));
+  return (
+    <>
+      <MicroAxis />
+      {data.map((point, index) => {
+        const top = y(point.value);
+        return (
+          <rect
+            className="micro-bar"
+            fill={point.color || "#b9872f"}
+            height={Math.max(2, bottom - top)}
+            key={point.time}
+            opacity={point.value > 0 ? 1 : 0.2}
+            width={barWidth}
+            x={x(index) - barWidth / 2}
+            y={top}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function MicroAxis() {
+  return <line className="micro-axis" x1="10" x2="250" y1="116" y2="116" />;
+}
+
+function scaleLinePoints(data, options = {}) {
+  const values = data.map((point) => point.value).filter(Number.isFinite);
+  const min = options.yMin ?? Math.min(...values);
+  const max = options.yMax ?? Math.max(...values);
+  const { x, y } = chartScales(data.length, min, max);
+  return data.map((point, index) => ({ x: x(index), y: y(point.value) })).filter((point) => Number.isFinite(point.y));
+}
+
+function chartScales(length, minValue, maxValue) {
+  const left = 10;
+  const right = 250;
+  const top = 10;
+  const bottom = 116;
+  const span = Math.max(0.0001, maxValue - minValue);
+  return {
+    bottom,
+    x: (index) => left + (index / Math.max(1, length - 1)) * (right - left),
+    y: (value) => bottom - ((value - minValue) / span) * (bottom - top)
+  };
+}
+
+function pointsToPath(points) {
+  return points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
+}
+
+function ChatContent({ content }) {
+  const blocks = String(content || "")
+    .replace(/\r\n/g, "\n")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) return null;
+
+  return blocks.map((block, blockIndex) => {
+    const lines = block.split("\n").map((line) => line.trim()).filter(Boolean);
+    const isList = lines.length > 1 && lines.every((line) => /^([-*]|\d+\.)\s+/.test(line));
+    if (isList) {
+      return (
+        <ul key={`block-${blockIndex}`}>
+          {lines.map((line, lineIndex) => (
+            <li key={`line-${lineIndex}`}>
+              <InlineText text={line.replace(/^([-*]|\d+\.)\s+/, "")} />
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    const headingMatch = block.match(/^#{1,3}\s+(.+)$/);
+    if (headingMatch) {
+      return (
+        <strong key={`block-${blockIndex}`} className="chat-subhead">
+          <InlineText text={headingMatch[1]} />
+        </strong>
+      );
+    }
+
+    return (
+      <p key={`block-${blockIndex}`}>
+        <InlineText text={block.replace(/\n/g, " ")} />
+      </p>
+    );
+  });
+}
+
+function InlineText({ text }) {
+  const parts = String(text || "").split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function downloadChatTranscript(messages) {
+  const timestamp = new Date().toISOString();
+  const body = [
+    "# RegimeAlpha 研究助手聊天记录",
+    "",
+    `导出时间：${timestamp}`,
+    "",
+    ...messages.map((message, index) => [
+      `## ${index + 1}. ${message.role === "assistant" ? "Assistant" : "User"}`,
+      "",
+      String(message.content || "").trim() || "(empty)",
+      ""
+    ].join("\n"))
+  ].join("\n");
+  const blob = new Blob([body], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `regimealpha-chat-${timestamp.slice(0, 10)}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function PanelTitle({ title, meta }) {
@@ -845,18 +1281,56 @@ function RegimeMark({ code }) {
   }
 }
 
-function Metric({ label, value, tone: metricTone }) {
+function Metric({ label, value, tone: metricTone, change }) {
   const explanation = METRIC_EXPLANATIONS[label];
   return (
-    <div className={`metric ${metricTone || ""}`} tabIndex={explanation ? 0 : undefined}>
+    <div className={`metric ${metricTone || ""} ${change ? "changed-widget" : ""}`} tabIndex={explanation ? 0 : undefined}>
       <span>{label}</span>
       <strong>{value ?? "-"}</strong>
+      {change ? <small className="widget-change-note">{change}</small> : null}
       {explanation ? (
         <span className="metric-tooltip" role="tooltip">
           <b>{explanation.title}</b>
           <em>{label}</em>
           <span>{explanation.body}</span>
         </span>
+      ) : null}
+    </div>
+  );
+}
+
+function TransitionBlock({ row, compact = false }) {
+  const transition = row.transition;
+  if (!transition) return null;
+  const probabilities = Object.entries(transition.probabilities || {}).slice(0, compact ? 2 : 3);
+  const likelyNext = transition.likelyNextLabelZh || REGIME_LABELS_ZH[transition.likelyNext] || transition.likelyNext;
+  const baseline = row.baselineLabelZh || REGIME_LABELS_ZH[row.baselineCode] || row.labelZh;
+
+  return (
+    <div className={`transition-block ${compact ? "compact" : ""} ${transitionTone(transition)}`} style={{ "--accent": COLORS[transition.likelyNext] || COLORS[row.code] }}>
+      <div className="transition-head">
+        <span>TVTP proxy</span>
+        <strong>{formatPressure(transition.pressure)}</strong>
+      </div>
+      <p>
+        Baseline {baseline} → likely {likelyNext}
+        {transition.probabilities?.[transition.likelyNext] ? ` (${formatPercent(transition.probabilities[transition.likelyNext])})` : ""}
+      </p>
+      {probabilities.length ? (
+        <div className="transition-probs">
+          {probabilities.map(([code, probability]) => (
+            <span key={code}>
+              {REGIME_LABELS_ZH[code] || code} {formatPercent(probability)}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {transition.triggers?.length ? (
+        <div className="transition-triggers">
+          {transition.triggers.slice(0, compact ? 3 : 5).map((trigger) => (
+            <span key={trigger}>{trigger}</span>
+          ))}
+        </div>
       ) : null}
     </div>
   );
@@ -928,8 +1402,159 @@ function buildCumulative(rows) {
   });
 }
 
+function buildWeeklyChangeSummary(latest, previous) {
+  if (!previous) {
+    return {
+      headline: `${latest.weekEnd} · ${latest.labelZh}`,
+      body: "No prior week is available for change comparison.",
+      widgets: {},
+      items: [
+        { label: "Regime", value: latest.labelZh, note: "Initial observation", changed: false, chartKey: null },
+        { label: "Switch Risk", value: formatPressure(latest.transition?.pressure), note: "TVTP proxy", changed: false, chartKey: "switchRisk" }
+      ]
+    };
+  }
+
+  const currentPressure = latest.transition?.pressure ?? 0;
+  const previousPressure = previous.transition?.pressure ?? 0;
+  const regimeChanged = latest.code !== previous.code;
+  const switchChanged = Math.abs(currentPressure - previousPressure) >= 15 || latest.transition?.status !== previous.transition?.status;
+  const vixDelta = (latest.metrics.vixClose ?? 0) - (previous.metrics.vixClose ?? 0);
+  const confidenceDelta = (latest.confidence ?? 0) - (previous.confidence ?? 0);
+  const spy13wDelta = (latest.metrics.ret13w ?? 0) - (previous.metrics.ret13w ?? 0);
+  const weeklyReturn = latest.metrics.weeklyReturn ?? 0;
+  const distribution = latest.metrics.distributionDay ? `Distribution day on ${latest.metrics.distributionDate}` : "No distribution day";
+
+  const widgets = {};
+  if (regimeChanged) {
+    widgets.regime = `Changed from ${previous.labelZh} to ${latest.labelZh}. Baseline was ${latest.baselineLabelZh || latest.labelZh}.`;
+  }
+  if (switchChanged || currentPressure >= 45) {
+    widgets.switchRisk = `Was ${formatPressure(previousPressure)}, now ${formatPressure(currentPressure)}.`;
+  }
+  if (Math.abs(vixDelta) >= 2) {
+    widgets.vix = `Was ${number(previous.metrics.vixClose, 1)}, now ${number(latest.metrics.vixClose, 1)}.`;
+  }
+  if (Math.abs(confidenceDelta) >= 0.1 || regimeChanged) {
+    widgets.confidence = `Was ${formatPercent(previous.confidence)}, now ${formatPercent(latest.confidence)}.`;
+  }
+  if (Math.abs(spy13wDelta) >= 0.005) {
+    widgets.spy13w = `Was ${formatPercent(previous.metrics.ret13w)}, now ${formatPercent(latest.metrics.ret13w)}.`;
+  }
+
+  const changePhrase = regimeChanged
+    ? `${previous.labelZh} -> ${latest.labelZh}`
+    : `${latest.labelZh} persisted`;
+  const headline = `${latest.weekEnd}: ${changePhrase}`;
+  const body = latest.transition?.switched
+    ? `The TVTP proxy moved the week into ${latest.labelZh} with ${formatPressure(currentPressure)} switch pressure. ${distribution}.`
+    : `The regime did not switch, but switch pressure is ${formatPressure(currentPressure)}. ${distribution}.`;
+
+  return {
+    headline,
+    body,
+    widgets,
+    items: [
+      {
+        label: "Regime",
+        value: regimeChanged ? `${previous.labelZh} -> ${latest.labelZh}` : latest.labelZh,
+        note: regimeChanged ? widgets.regime : "No label change",
+        changed: regimeChanged,
+        chartKey: null
+      },
+      {
+        label: "Switch Risk",
+        value: `${formatPressure(previousPressure)} -> ${formatPressure(currentPressure)}`,
+        note: latest.transition?.status || "stable",
+        changed: Boolean(widgets.switchRisk),
+        chartKey: "switchRisk"
+      },
+      {
+        label: "SPY 1W",
+        value: formatPercent(weeklyReturn),
+        note: weeklyReturn < 0 ? "Latest weekly selloff" : "Latest weekly return",
+        changed: Math.abs(weeklyReturn) >= 0.015,
+        chartKey: "spyCandle"
+      },
+      {
+        label: "VIX",
+        value: `${number(previous.metrics.vixClose, 1)} -> ${number(latest.metrics.vixClose, 1)}`,
+        note: vixDelta >= 0 ? `+${number(vixDelta, 1)} WoW` : `${number(vixDelta, 1)} WoW`,
+        changed: Boolean(widgets.vix),
+        chartKey: "vix"
+      },
+      {
+        label: "Volume Shock",
+        value: latest.metrics.distributionDay ? `z=${number(latest.metrics.downVolumeZ20, 1)}` : "none",
+        note: distribution,
+        changed: Boolean(latest.metrics.distributionDay),
+        chartKey: "volumeShock"
+      }
+    ]
+  };
+}
+
+function buildWeeklySummaryCharts(rows) {
+  const history = rows.slice(-12);
+  const recentHistory = rows.slice(-6);
+  const candleData = history
+    .map((row) => ({
+      time: row.weekEnd,
+      open: row.metrics.spyOpen,
+      high: row.metrics.spyHigh,
+      low: row.metrics.spyLow,
+      close: row.metrics.spyClose
+    }))
+    .filter((row) => [row.open, row.high, row.low, row.close].every(Number.isFinite));
+
+  return {
+    spyCandle: {
+      kind: "candlestick",
+      label: "SPY weekly candlestick, last 12 weeks",
+      caption: "SPY 12W candle",
+      data: candleData
+    },
+    switchRisk: {
+      kind: "line-hot",
+      label: "Switch risk, last 6 weeks",
+      caption: "TVTP 6W · last move",
+      highlightLast: true,
+      yMax: 100,
+      yMin: 0,
+      data: recentHistory
+        .map((row) => ({ time: row.weekEnd, value: row.transition?.pressure }))
+        .filter((row) => Number.isFinite(row.value))
+    },
+    vix: {
+      kind: "line-hot",
+      label: "VIX close, last 6 weeks",
+      caption: "VIX 6W · last move",
+      highlightLast: true,
+      data: recentHistory
+        .map((row) => ({ time: row.weekEnd, value: row.metrics.vixClose }))
+        .filter((row) => Number.isFinite(row.value))
+    },
+    volumeShock: {
+      kind: "histogram",
+      label: "Down-volume z-score, last 12 weeks",
+      caption: "Down-volume z",
+      yMin: 0,
+      data: history
+        .map((row) => {
+          const shock = row.metrics.downVolumeZ20 ?? 0;
+          return {
+            time: row.weekEnd,
+            value: Math.max(0, shock),
+            color: shock >= 2 ? "#b9872f" : "rgba(113, 80, 21, 0.24)"
+          };
+        })
+        .filter((row) => Number.isFinite(row.value))
+    }
+  };
+}
+
 function downloadCsv(rows, assetRegimes = []) {
-  const headers = ["scope", "symbol", "displaySymbol", "weekStart", "weekEnd", "regime", "regimeZh", "confidence", "weeklyReturn", "ret13w", "relativeToSpy13w", "vix", "realizedVol20", "correlationToSpy63"];
+  const headers = ["scope", "symbol", "displaySymbol", "weekStart", "weekEnd", "regime", "regimeZh", "baselineRegime", "transitionPressure", "transitionStatus", "likelyNext", "confidence", "weeklyReturn", "ret13w", "relativeToSpy13w", "vix", "realizedVol20", "downVolumeZ20", "distributionDay", "correlationToSpy63"];
   const lines = [
     headers.join(","),
     ...rows.map((row) =>
@@ -941,12 +1566,18 @@ function downloadCsv(rows, assetRegimes = []) {
         row.weekEnd,
         row.label,
         row.labelZh,
+        row.baselineCode || row.code,
+        row.transition?.pressure ?? "",
+        row.transition?.status ?? "",
+        row.transition?.likelyNext ?? "",
         row.confidence,
         row.metrics.weeklyReturn,
         row.metrics.ret13w,
         0,
         row.metrics.vixClose,
         row.metrics.realizedVol20,
+        row.metrics.downVolumeZ20,
+        row.metrics.distributionDay,
         row.metrics.sectorCorrelation20
       ].join(",")
     ),
@@ -960,12 +1591,18 @@ function downloadCsv(rows, assetRegimes = []) {
           row.weekEnd,
           row.label,
           row.labelZh,
+          row.baselineCode || row.code,
+          row.transition?.pressure ?? "",
+          row.transition?.status ?? "",
+          row.transition?.likelyNext ?? "",
           row.confidence,
           row.metrics.weeklyReturn,
           row.metrics.ret13w,
           row.metrics.relativeToSpy13w,
           row.metrics.vixClose,
           row.metrics.realizedVol20,
+          row.metrics.downVolumeZ20,
+          row.metrics.distributionDay,
           row.metrics.correlationToSpy63
         ].join(",")
       )
@@ -982,6 +1619,10 @@ function downloadCsv(rows, assetRegimes = []) {
 
 function formatPercent(value) {
   return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "-";
+}
+
+function formatPressure(value) {
+  return Number.isFinite(value) ? `${value.toFixed(0)}/100` : "-";
 }
 
 function number(value, digits = 2) {
@@ -1004,4 +1645,12 @@ function formatDateTime(value) {
 function tone(value) {
   if (!Number.isFinite(value)) return "";
   return value >= 0 ? "good" : "bad";
+}
+
+function transitionTone(transition) {
+  const pressure = typeof transition === "number" ? transition : transition?.pressure;
+  if (!Number.isFinite(pressure)) return "";
+  if (pressure >= 65) return "bad";
+  if (pressure >= 45) return "warn";
+  return "good";
 }

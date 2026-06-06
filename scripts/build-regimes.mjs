@@ -46,6 +46,11 @@ const INDUSTRY_PROXIES = [
   { symbol: "XME", displaySymbol: "XME", name: "Metals & Mining", group: "Industry" },
   { symbol: "IYT", displaySymbol: "IYT", name: "Transports", group: "Industry" }
 ];
+const INTERNATIONAL_PROXIES = [
+  { symbol: "EWY", displaySymbol: "EWY", name: "iShares MSCI South Korea ETF", group: "International" },
+  { symbol: "^KS11", displaySymbol: "KOSPI", name: "KOSPI Composite", group: "International", proxyNote: "FMP ^KS11 is used as the Korea equity index proxy." },
+  { symbol: "^N225", displaySymbol: "Nikkei 225", name: "Nikkei 225", group: "International", proxyNote: "FMP ^N225 is used as the Japan/Nikkei equity index proxy." }
+];
 
 function loadLocalEnv(paths) {
   for (const envPath of paths) {
@@ -82,7 +87,8 @@ const ASSET_PROXIES = [
   { symbol: "QQQ", displaySymbol: "QQQ", name: "Nasdaq 100", group: "Style" },
   { symbol: "IWM", displaySymbol: "IWM", name: "Russell 2000", group: "Style" },
   ...BROAD_SECTOR_PROXIES,
-  ...INDUSTRY_PROXIES
+  ...INDUSTRY_PROXIES,
+  ...INTERNATIONAL_PROXIES
 ];
 const SECTOR_SYMBOLS = BROAD_SECTOR_PROXIES.map((proxy) => proxy.symbol);
 const SYMBOLS = [...new Set([...PRIMARY_SYMBOLS, ...ASSET_PROXIES.map((proxy) => proxy.symbol)])];
@@ -238,7 +244,7 @@ async function main() {
       dataThrough,
       symbols: SYMBOLS,
       primaryProxy: "SPY",
-      model: "rules-v1.1-sector-aware",
+      model: "rules-v1.2-transition-proxy",
       source: {
         vendor: "Financial Modeling Prep",
         endpoint: "https://financialmodelingprep.com/stable/historical-price-eod/full",
@@ -247,6 +253,7 @@ async function main() {
       methodology: [
         "SPY daily bars are aggregated to calendar weeks using the last trading day as weekEnd.",
         "Market-level regime labels use the paper's taxonomy: return drift, realized volatility, correlation, VIX, equity-bond correlation, serial autocorrelation, and microstructure shock proxies.",
+        "A TVTP-style transition proxy estimates off-diagonal switch pressure from weekly selloffs, high-volume down days, VIX stress, trend-efficiency collapse, and moving-average breaks.",
         "Sector and industry proxies are classified separately using each proxy's own trend, volatility, drawdown, serial autocorrelation, market-relative return, and correlation-to-SPY metrics.",
         "SOX is represented by SOXX because the FMP EOD endpoint returned no ^SOX historical bars in this environment.",
         "Sector ETF pairwise rolling correlations approximate cross-asset correlation dynamics.",
@@ -420,7 +427,11 @@ function buildMarketRegimeRows({ spy, vix, tlt, qqq, sectors, dateMaps, weeks })
     const tltRow = nearestOnOrBefore(tlt, week.weekEnd);
     const qqqRow = nearestOnOrBefore(qqq, week.weekEnd);
 
+    const shock = weeklyShockMetrics(week.bars, spy);
     const metrics = {
+      spyOpen: round(week.open, 2),
+      spyHigh: round(week.high, 2),
+      spyLow: round(week.low, 2),
       spyClose: round(week.close, 2),
       weeklyReturn: round(weeklyReturn, 5),
       ret4w: round(returnAgo(spy, endIndex, 20), 5),
@@ -438,8 +449,14 @@ function buildMarketRegimeRows({ spy, vix, tlt, qqq, sectors, dateMaps, weeks })
       trendEfficiency20: round(trendEfficiency(spy, endIndex, 20), 4),
       weekRange: round(week.high / week.low - 1, 5),
       maxAbsDailyReturn: round(Math.max(...week.bars.map((bar) => Math.abs(bar.dailyReturn || 0))), 5),
+      maxDownDailyReturn: shock.maxDownDailyReturn,
       maxOpenGap: round(maxOpenGap(week.bars, spy, endIndex), 5),
       volumeZ13w: round(zScore(weeklyVolumes, 13), 4),
+      downVolumeZ20: shock.downVolumeZ20,
+      downVolumeZ63: shock.downVolumeZ63,
+      distributionDay: shock.distributionDay,
+      distributionDate: shock.distributionDate,
+      shockDownDay: shock.shockDownDay,
       drawdown52w: round(drawdownFromHigh(spy, endIndex, 252), 5),
       aboveMa50: end.close > sma(spy, endIndex, 50),
       aboveMa200: end.close > sma(spy, endIndex, 200),
@@ -453,12 +470,15 @@ function buildMarketRegimeRows({ spy, vix, tlt, qqq, sectors, dateMaps, weeks })
       weekStart: week.weekStart,
       weekEnd: week.weekEnd,
       code: classification.code,
+      baselineCode: classification.baselineCode,
+      baselineLabelZh: classification.baselineLabelZh,
       order: def.order,
       label: def.label,
       labelZh: def.labelZh,
       family: def.family,
       confidence: classification.confidence,
       scores: classification.scores,
+      transition: classification.transition,
       metrics,
       drivers: classification.drivers,
       thesis: def.thesis,
@@ -508,6 +528,7 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
     weeklyVolumes.push(sum(sorted.map((bar) => bar.volume)));
 
     const correlationToSpy63 = rollingCorrelation(rows, spy, week.weekEnd, 63);
+    const shock = weeklyShockMetrics(sorted, rows);
     const metrics = {
       close: round(last.close, 2),
       weeklyReturn: round(weeklyReturn, 5),
@@ -528,8 +549,14 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
       trendEfficiency20: round(trendEfficiency(rows, endIndex, 20), 4),
       weekRange: round(Math.max(...sorted.map((bar) => bar.high)) / Math.min(...sorted.map((bar) => bar.low)) - 1, 5),
       maxAbsDailyReturn: round(Math.max(...sorted.map((bar) => Math.abs(bar.dailyReturn || 0))), 5),
+      maxDownDailyReturn: shock.maxDownDailyReturn,
       maxOpenGap: round(maxOpenGap(sorted, rows, endIndex), 5),
       volumeZ13w: round(zScore(weeklyVolumes, 13), 4),
+      downVolumeZ20: shock.downVolumeZ20,
+      downVolumeZ63: shock.downVolumeZ63,
+      distributionDay: shock.distributionDay,
+      distributionDate: shock.distributionDate,
+      shockDownDay: shock.shockDownDay,
       drawdown52w: round(drawdownFromHigh(rows, endIndex, 252), 5),
       aboveMa50: last.close > sma(rows, endIndex, 50),
       aboveMa200: last.close > sma(rows, endIndex, 200),
@@ -549,12 +576,15 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
       name: proxy.name,
       group: proxy.group,
       code: classification.code,
+      baselineCode: classification.baselineCode,
+      baselineLabelZh: classification.baselineLabelZh,
       order: def.order,
       label: def.label,
       labelZh: def.labelZh,
       family: def.family,
       confidence: classification.confidence,
       scores: classification.scores,
+      transition: classification.transition,
       metrics,
       drivers: classification.drivers,
       thesis: def.thesis
@@ -565,19 +595,45 @@ function buildAssetRegimeRows(proxy, rows, weeks, { spy, vix, tlt, marketContext
 }
 
 function classify(m, targetLabel = "SPY") {
+  const ranked = rankRegimeScores(m);
+  const [baselineCode, top] = ranked[0];
+  const second = ranked[1]?.[1] ?? 0;
+  const baselineConfidence = round(Math.max(0.45, Math.min(0.96, 0.52 + (top - second) / 2.8)), 2);
+  const transition = computeTransitionProxy(m, baselineCode);
+  const code = transition.switched ? transition.likelyNext : baselineCode;
+  const confidence = transition.switched
+    ? round(Math.max(0.55, Math.min(0.92, 0.55 + transition.pressure / 250)), 2)
+    : baselineConfidence;
+  const transitionDrivers = transition.pressure >= 50 ? transition.triggers.slice(0, 3) : [];
+
+  return {
+    code,
+    baselineCode,
+    baselineLabelZh: REGIMES[baselineCode].labelZh,
+    confidence,
+    scores: Object.fromEntries(ranked.slice(0, 5)),
+    transition,
+    drivers: [...transitionDrivers, ...buildDrivers(code, m, targetLabel)].slice(0, 4)
+  };
+}
+
+function rankRegimeScores(m) {
   const vix = m.vixClose ?? 18;
   const rv = m.realizedVol20 ?? 0.16;
   const corr = m.sectorCorrelation20 ?? 0.45;
   const ebCorr = m.equityBondCorrelation63 ?? 0;
+  const weekly = m.weeklyReturn ?? 0;
   const ret13 = m.ret13w ?? 0;
   const ret4 = m.ret4w ?? 0;
   const qLead = m.qqqLeadership13w ?? 0;
   const tlt13 = m.tlt13w ?? 0;
   const volZ = m.volumeZ13w ?? 0;
+  const downVolZ = m.downVolumeZ20 ?? 0;
   const serial = m.serialAutocorr20 ?? 0;
   const efficiency = m.trendEfficiency20 ?? 0;
   const range = m.weekRange ?? 0;
   const maxDaily = m.maxAbsDailyReturn ?? 0;
+  const maxDown = -(m.maxDownDailyReturn ?? 0);
   const gap = m.maxOpenGap ?? 0;
 
   const scores = {
@@ -620,19 +676,26 @@ function classify(m, targetLabel = "SPY") {
       0.85 * scale(vix, 19, 32) +
       0.7 * scale(rv, 0.19, 0.34) +
       0.45 * scale(corr, 0.5, 0.72) +
-      0.35 * scale(range, 0.04, 0.085),
+      0.35 * scale(range, 0.04, 0.085) +
+      0.55 * scale(-weekly, 0.015, 0.045) +
+      0.45 * scale(downVolZ, 1.5, 5),
     sideways_volatile:
       1.05 * scale(0.055 - Math.abs(ret13), 0, 0.055) +
       0.85 * scale(vix, 19, 31) +
       0.75 * scale(rv, 0.18, 0.32) +
       0.55 * scale(1 - efficiency, 0.45, 0.85) +
-      0.35 * scale(range, 0.04, 0.08),
+      0.35 * scale(range, 0.04, 0.08) +
+      0.45 * scale(-weekly, 0.015, 0.045) +
+      0.4 * scale(downVolZ, 1.5, 5),
     bull_quiet:
       1.05 * scale(ret13, 0.035, 0.13) +
       0.85 * scale(19 - vix, 0, 8) +
       0.75 * scale(0.2 - rv, 0, 0.12) +
       0.45 * scale(0.58 - corr, 0, 0.3) +
-      (m.aboveMa50 ? 0.2 : 0),
+      (m.aboveMa50 ? 0.2 : 0) -
+      0.65 * scale(vix, 20, 25) -
+      0.55 * scale(-weekly, 0.015, 0.04) -
+      0.45 * scale(downVolZ, 2, 5),
     bear_quiet:
       1.05 * scale(-ret13, 0.035, 0.13) +
       0.7 * scale(24 - vix, 0, 10) +
@@ -657,24 +720,143 @@ function classify(m, targetLabel = "SPY") {
   if (scores.mean_reverting < 1.8 || (rv < 0.18 && vix < 19)) {
     scores.mean_reverting *= 0.65;
   }
+  if (scores.bull_quiet > 0 && (vix >= 20 || weekly <= -0.02 || maxDown >= 0.02 || m.distributionDay)) {
+    scores.bull_quiet *= 0.72;
+  }
 
-  const ranked = Object.entries(scores)
+  return Object.entries(scores)
     .map(([code, score]) => [code, round(score, 4)])
     .sort((a, b) => b[1] - a[1]);
-  const [code, top] = ranked[0];
-  const second = ranked[1]?.[1] ?? 0;
-  const confidence = round(Math.max(0.45, Math.min(0.96, 0.52 + (top - second) / 2.8)), 2);
+}
+
+function computeTransitionProxy(m, baselineCode) {
+  const vix = m.vixClose ?? 18;
+  const weekly = m.weeklyReturn ?? 0;
+  const ret13 = m.ret13w ?? 0;
+  const ret4 = m.ret4w ?? 0;
+  const rv = m.realizedVol20 ?? 0.16;
+  const efficiency = m.trendEfficiency20 ?? 0.35;
+  const downVolZ = m.downVolumeZ20 ?? 0;
+  const maxDown = -(m.maxDownDailyReturn ?? 0);
+  const pressure = round(Math.min(100,
+    22 * scale(-weekly, 0.015, 0.045) +
+    24 * scale(downVolZ, 1.5, 5) +
+    18 * scale(vix, 19, 25) +
+    10 * scale(m.vix4wChange ?? 0, 3, 10) +
+    14 * scale(0.25 - efficiency, 0, 0.25) +
+    12 * scale(maxDown, 0.015, 0.035) +
+    8 * (m.distributionDay ? 1 : 0) +
+    8 * (weekly <= -0.02 ? 1 : 0) +
+    8 * (vix >= 20 ? 1 : 0) +
+    10 * (!m.aboveMa50 ? 1 : 0) +
+    10 * (!m.aboveMa200 ? 1 : 0)
+  ), 1);
+
+  const probabilities = transitionProbabilities({
+    baselineCode,
+    pressure,
+    vix,
+    weekly,
+    ret13,
+    ret4,
+    rv,
+    efficiency,
+    downVolZ,
+    maxDown,
+    aboveMa50: m.aboveMa50,
+    aboveMa200: m.aboveMa200,
+    distributionDay: m.distributionDay
+  });
+  const likelyNext = Object.entries(probabilities)
+    .filter(([code]) => code !== baselineCode)
+    .sort((a, b) => b[1] - a[1])[0]?.[0] ?? baselineCode;
+  const likelyNextProbability = probabilities[likelyNext] ?? 0;
+  const switched = pressure >= 65 && likelyNext !== baselineCode && likelyNextProbability >= 0.35;
 
   return {
-    code,
-    confidence,
-    scores: Object.fromEntries(ranked.slice(0, 5)),
-    drivers: buildDrivers(code, m, targetLabel)
+    pressure,
+    status: pressure >= 65 ? "switch" : pressure >= 45 ? "watch" : "stable",
+    from: baselineCode,
+    likelyNext,
+    likelyNextLabelZh: REGIMES[likelyNext]?.labelZh,
+    switched,
+    probabilities,
+    triggers: transitionTriggers(m)
   };
 }
 
+function transitionProbabilities(inputs) {
+  const {
+    baselineCode,
+    pressure,
+    vix,
+    weekly,
+    ret13,
+    ret4,
+    rv,
+    efficiency,
+    downVolZ,
+    maxDown,
+    aboveMa50,
+    aboveMa200,
+    distributionDay
+  } = inputs;
+  const stayWeight = Math.max(0.22, 1.45 - pressure / 58);
+  const bullVolatile =
+    0.35 +
+    0.55 * scale(ret13, 0.035, 0.13) +
+    0.45 * scale(vix, 19, 25) +
+    0.35 * scale(-weekly, 0.015, 0.045) +
+    0.25 * scale(downVolZ, 1.5, 5) +
+    0.2 * (distributionDay ? 1 : 0);
+  const sidewaysVolatile =
+    0.3 +
+    0.45 * scale(0.025 - Math.abs(ret4), 0, 0.025) +
+    0.45 * scale(0.3 - efficiency, 0, 0.3) +
+    0.35 * scale(-weekly, 0.015, 0.045) +
+    0.25 * scale(vix, 20, 25);
+  const bearVolatile =
+    0.12 +
+    0.55 * scale(-ret13, 0.015, 0.09) +
+    0.5 * scale(vix, 24, 32) +
+    0.45 * scale(rv, 0.2, 0.35) +
+    0.35 * scale(maxDown, 0.025, 0.05) +
+    0.3 * (!aboveMa50 ? 1 : 0) +
+    0.3 * (!aboveMa200 ? 1 : 0);
+
+  const candidates = new Map([[baselineCode, stayWeight]]);
+  const addCandidate = (code, value) => {
+    if (code !== baselineCode) {
+      candidates.set(code, value);
+    }
+  };
+  addCandidate("bull_volatile", bullVolatile);
+  addCandidate("sideways_volatile", sidewaysVolatile);
+  addCandidate("bear_volatile", bearVolatile);
+  if (ret13 < -0.015 && aboveMa50 === false && vix < 24) {
+    addCandidate("bear_quiet", 0.3 + 0.5 * scale(-ret13, 0.02, 0.12));
+  }
+  const total = sum([...candidates.values()]);
+  return Object.fromEntries(
+    [...candidates.entries()]
+      .map(([code, value]) => [code, round(value / total, 4)])
+      .sort((a, b) => b[1] - a[1])
+  );
+}
+
+function transitionTriggers(m) {
+  const triggers = [];
+  if ((m.weeklyReturn ?? 0) <= -0.02) triggers.push(`SPY weekly selloff ${pct(m.weeklyReturn)}`);
+  if ((m.maxDownDailyReturn ?? 0) <= -0.02) triggers.push(`single-day drop ${pct(m.maxDownDailyReturn)}`);
+  if ((m.downVolumeZ20 ?? 0) >= 2) triggers.push(`high-volume down day z=${round(m.downVolumeZ20, 1)}`);
+  if ((m.vixClose ?? 0) >= 20) triggers.push(`VIX crossed ${round(m.vixClose, 1)}`);
+  if ((m.trendEfficiency20 ?? 1) <= 0.08) triggers.push(`20D trend efficiency ${round(m.trendEfficiency20, 2)}`);
+  if (m.aboveMa50 === false) triggers.push("below MA50");
+  if (m.aboveMa200 === false) triggers.push("below MA200");
+  return triggers.slice(0, 6);
+}
+
 function buildDrivers(code, m, targetLabel = "SPY") {
-  const pct = (value) => `${round(value * 100, 1)}%`;
   const drivers = [];
   if (code.includes("bull") || code === "trend_accelerating") drivers.push(`13 周 ${targetLabel} 收益 ${pct(m.ret13w || 0)}`);
   if (code.includes("bear") || code === "stagflationary") drivers.push(`13 周 ${targetLabel} 收益 ${pct(m.ret13w || 0)}`);
@@ -696,6 +878,32 @@ function enrichDaily(rows) {
     dailyReturn: index > 0 ? row.close / rows[index - 1].close - 1 : null,
     range: row.high / row.low - 1
   }));
+}
+
+function weeklyShockMetrics(weekBars, rows) {
+  const downBars = weekBars
+    .map((bar) => {
+      const index = findIndexByDate(rows, bar.date);
+      return {
+        date: bar.date,
+        dailyReturn: bar.dailyReturn,
+        volumeZ20: index >= 0 ? dailyVolumeZ(rows, index, 20) : 0,
+        volumeZ63: index >= 0 ? dailyVolumeZ(rows, index, 63) : 0
+      };
+    })
+    .filter((bar) => Number.isFinite(bar.dailyReturn) && bar.dailyReturn < 0);
+  const worstDown = downBars.sort((a, b) => a.dailyReturn - b.dailyReturn)[0];
+  const highestVolumeDown = downBars.sort((a, b) => b.volumeZ20 - a.volumeZ20)[0];
+  const distribution = downBars.find((bar) => bar.dailyReturn <= -0.015 && bar.volumeZ20 >= 2);
+
+  return {
+    maxDownDailyReturn: round(worstDown?.dailyReturn ?? 0, 5),
+    downVolumeZ20: round(highestVolumeDown?.volumeZ20 ?? 0, 4),
+    downVolumeZ63: round(highestVolumeDown?.volumeZ63 ?? 0, 4),
+    distributionDay: Boolean(distribution),
+    distributionDate: distribution?.date ?? null,
+    shockDownDay: Boolean(worstDown && worstDown.dailyReturn <= -0.02)
+  };
 }
 
 function summarize(rows) {
@@ -922,6 +1130,13 @@ function zScore(values, window) {
   const prior = slice.slice(0, -1);
   const sd = stddev(prior);
   return sd > 0 ? (slice.at(-1) - average(prior)) / sd : 0;
+}
+
+function dailyVolumeZ(rows, index, window) {
+  const prior = rows.slice(Math.max(0, index - window), index).map((row) => row.volume).filter(Number.isFinite);
+  if (prior.length < 4) return 0;
+  const sd = stddev(prior);
+  return sd > 0 ? (rows[index].volume - average(prior)) / sd : 0;
 }
 
 function correlation(a, b) {
@@ -1178,4 +1393,8 @@ function sqlString(value) {
 
 function shellQuote(value) {
   return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function pct(value) {
+  return `${round((value || 0) * 100, 1)}%`;
 }

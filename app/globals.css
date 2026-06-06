@@ -7,6 +7,9 @@
   --line-strong: #aeb8ad;
   --good: #18724f;
   --bad: #b93635;
+  --change: #b9872f;
+  --change-ink: #715015;
+  --change-soft: #fff6df;
   --shadow: 0 18px 45px rgba(29, 35, 32, 0.08);
 }
 
@@ -100,6 +103,9 @@ h1 {
 }
 
 .latest-panel,
+.weekly-summary-panel,
+.source-panel,
+.mcp-panel,
 .controls-panel,
 .heatmap-panel,
 .asset-panel,
@@ -121,6 +127,376 @@ h1 {
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
   padding: clamp(18px, 3vw, 30px);
+}
+
+.source-panel {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.mcp-panel {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  padding: 18px;
+}
+
+.mcp-panel h3 {
+  margin-bottom: 6px;
+}
+
+.mcp-panel p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.endpoint-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.endpoint-list div {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.endpoint-list span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.endpoint-list code {
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.mcp-note {
+  margin-bottom: 0;
+}
+
+.source-panel h3 {
+  font-size: clamp(1.1rem, 2vw, 1.55rem);
+  margin-bottom: 6px;
+}
+
+.source-panel p:last-child {
+  color: var(--muted);
+  line-height: 1.55;
+  margin-bottom: 0;
+}
+
+.source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.source-actions a,
+.source-actions button,
+.chat-launcher,
+.chat-form button,
+.chat-head button,
+.chat-suggestions button {
+  align-items: center;
+  background: #161a1d;
+  border: 1px solid #161a1d;
+  border-radius: 6px;
+  color: #f7faf4;
+  display: inline-flex;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  text-decoration: none;
+}
+
+.source-actions button,
+.source-actions a:not(:first-child) {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.chat-head-actions {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+
+.weekly-summary-panel {
+  display: grid;
+  gap: 20px;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.summary-overview-row {
+  display: grid;
+  gap: clamp(18px, 2.2vw, 28px);
+  grid-template-columns: minmax(320px, 0.82fr) minmax(360px, 1.18fr);
+}
+
+.summary-latest-card {
+  border: 1px solid color-mix(in oklch, var(--accent) 42%, var(--line));
+  border-radius: 6px;
+  padding: 16px;
+  position: relative;
+}
+
+.summary-latest-card h2 {
+  align-items: center;
+  display: flex;
+  font-size: clamp(2rem, 3.2vw, 3.8rem);
+  gap: 12px;
+  line-height: 0.98;
+  margin-bottom: 12px;
+}
+
+.summary-latest-card p:last-child {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.62;
+  margin-bottom: 0;
+}
+
+.summary-copy {
+  align-content: center;
+  display: grid;
+  gap: 10px;
+}
+
+.summary-copy h3 {
+  font-size: clamp(1.55rem, 2.35vw, 2.45rem);
+  line-height: 1.15;
+  margin-bottom: 0;
+}
+
+.summary-copy p:last-child,
+.summary-footnote {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.summary-metrics-strip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.summary-change-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.summary-change-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  display: grid;
+  gap: 7px;
+  grid-template-rows: auto auto auto 1fr;
+  min-height: 288px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.summary-change-card span,
+.summary-trigger-strip span,
+.transition-head span,
+.widget-change-note {
+  color: var(--muted);
+  display: block;
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+}
+
+.summary-change-card strong {
+  display: block;
+  font-size: clamp(1rem, 1.2vw, 1.22rem);
+  line-height: 1.25;
+  margin: 2px 0 1px;
+  overflow-wrap: anywhere;
+}
+
+.summary-change-card small,
+.widget-change-note {
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.micro-chart {
+  border-top: 1px solid color-mix(in oklch, var(--line) 74%, transparent);
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  min-height: 150px;
+  padding-top: 10px;
+}
+
+.micro-chart-canvas {
+  height: 128px;
+  min-width: 0;
+  overflow: visible;
+  width: 100%;
+}
+
+.micro-axis {
+  stroke: color-mix(in oklch, var(--line) 76%, transparent);
+  stroke-width: 1;
+}
+
+.micro-line {
+  fill: none;
+  stroke: #9a6a17;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.micro-line.muted {
+  stroke: rgba(154, 106, 23, 0.34);
+  stroke-width: 2.4;
+}
+
+.micro-line.highlight {
+  stroke: #a45f0a;
+  stroke-width: 5.2;
+}
+
+.micro-point {
+  fill: #a45f0a;
+  stroke: color-mix(in oklch, var(--paper) 86%, white);
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.micro-candle line {
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.micro-candle rect {
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.micro-candle.up line,
+.micro-candle.up rect {
+  fill: #2f8759;
+  stroke: #2f8759;
+}
+
+.micro-candle.down line,
+.micro-candle.down rect {
+  fill: #9a413c;
+  stroke: #9a413c;
+}
+
+.micro-bar {
+  vector-effect: non-scaling-stroke;
+}
+
+.micro-chart em {
+  color: color-mix(in oklch, var(--muted) 78%, var(--change-ink));
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.62rem;
+  font-style: normal;
+}
+
+.chart-attribution {
+  color: color-mix(in oklch, var(--muted) 78%, var(--paper));
+  font-size: 0.68rem;
+  grid-column: 1;
+  justify-self: end;
+  text-decoration: none;
+}
+
+.chart-attribution:hover {
+  color: var(--ink);
+}
+
+.summary-trigger-strip {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.summary-trigger-strip strong,
+.transition-triggers span,
+.transition-probs span {
+  background: color-mix(in oklch, var(--change-soft) 86%, var(--paper));
+  border: 1px solid color-mix(in oklch, var(--change) 48%, var(--line));
+  border-radius: 999px;
+  color: var(--change-ink);
+  font-size: 0.76rem;
+  padding: 6px 9px;
+}
+
+.summary-footnote {
+  grid-column: 1 / -1;
+}
+
+.weekly-summary-panel > .transition-block {
+  grid-column: 1 / -1;
+}
+
+.changed-widget {
+  background:
+    radial-gradient(circle at top right, color-mix(in oklch, var(--change) 13%, transparent) 0 38px, transparent 39px),
+    linear-gradient(135deg, color-mix(in oklch, var(--change-soft) 58%, var(--paper)) 0%, color-mix(in oklch, var(--paper) 96%, white) 62%);
+  border-color: color-mix(in oklch, var(--change) 56%, var(--line)) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--change) 22%, transparent),
+    0 14px 30px rgba(94, 73, 28, 0.1);
+  position: relative;
+}
+
+.changed-widget::after {
+  background: var(--change);
+  border: 2px solid color-mix(in oklch, var(--paper) 82%, white);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--change) 17%, transparent);
+  content: "";
+  height: 8px;
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 8px;
+}
+
+.latest-copy.changed-widget {
+  border: 1px solid color-mix(in oklch, var(--change) 56%, var(--line));
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.widget-change-note {
+  color: var(--change-ink);
+  margin-top: 8px;
+}
+
+.metric.changed-widget.bad strong {
+  color: var(--change-ink);
 }
 
 .latest-copy h2 {
@@ -157,6 +533,11 @@ h1 {
   min-width: 0;
   padding: 14px;
   position: relative;
+}
+
+.metric.warn strong,
+td.warn {
+  color: #a46400;
 }
 
 .metric span {
@@ -207,7 +588,8 @@ h1 {
 }
 
 .metric:nth-child(3n) .metric-tooltip,
-.latest-metrics .metric:last-child .metric-tooltip {
+.latest-metrics .metric:last-child .metric-tooltip,
+.summary-metrics-strip .metric:nth-last-child(-n + 2) .metric-tooltip {
   left: auto;
   right: 12px;
 }
@@ -954,6 +1336,62 @@ input {
   padding: 7px 10px;
 }
 
+.transition-block {
+  background: color-mix(in oklch, var(--accent) 9%, white);
+  border: 1px solid color-mix(in oklch, var(--accent) 34%, var(--line));
+  border-radius: 6px;
+  margin: 12px 0 16px;
+  padding: 13px;
+}
+
+.latest-panel > .transition-block {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.transition-block.compact {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 0.55fr) minmax(0, 1fr);
+}
+
+.transition-head {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.transition-head strong {
+  color: color-mix(in oklch, var(--accent) 72%, #111);
+  font-size: 1.35rem;
+}
+
+.transition-block p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.transition-probs,
+.transition-triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.transition-block.compact .transition-probs,
+.transition-block.compact .transition-triggers {
+  align-content: center;
+}
+
+.transition-block.good .transition-triggers span,
+.transition-block.good .transition-probs span {
+  background: color-mix(in oklch, var(--accent) 10%, white);
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--line));
+  color: color-mix(in oklch, var(--accent) 62%, #111);
+}
+
 .strategy-block {
   border-top: 1px solid var(--line);
   margin-top: 18px;
@@ -1162,6 +1600,183 @@ tbody tr:hover,
   line-height: 1.55;
   margin: 0;
   padding-left: 12px;
+}
+
+.chat-launcher {
+  bottom: 22px;
+  box-shadow: 0 18px 42px rgba(22, 26, 29, 0.2);
+  position: fixed;
+  right: 22px;
+  z-index: 120;
+}
+
+.chat-panel {
+  background: color-mix(in oklch, var(--paper) 94%, white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  bottom: 76px;
+  box-shadow: 0 26px 70px rgba(22, 26, 29, 0.22);
+  display: grid;
+  gap: 10px;
+  inline-size: min(520px, calc(100vw - 24px));
+  max-height: min(720px, calc(100vh - 96px));
+  overflow: hidden;
+  padding: 12px;
+  position: fixed;
+  right: 22px;
+  z-index: 130;
+}
+
+.chat-head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 10px;
+}
+
+.chat-head span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.chat-head strong {
+  font-size: 1rem;
+}
+
+.chat-head button {
+  background: transparent;
+  color: var(--ink);
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.chat-head-actions button:first-child {
+  background: #eef3ea;
+  border-color: var(--line);
+  font-size: 0.76rem;
+}
+
+.chat-head-actions button:last-child {
+  font-size: 1.25rem;
+}
+
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chat-suggestions button {
+  background: #eef3ea;
+  border-color: var(--line);
+  color: var(--ink);
+  font-size: 0.76rem;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.chat-messages {
+  display: grid;
+  gap: 9px;
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.chat-message {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  line-height: 1.55;
+  padding: 10px 11px;
+  white-space: normal;
+}
+
+.chat-message p,
+.chat-message ul {
+  margin: 0;
+}
+
+.chat-message p + p,
+.chat-message p + ul,
+.chat-message ul + p,
+.chat-message ul + ul,
+.chat-message .chat-subhead + p,
+.chat-message .chat-subhead + ul {
+  margin-top: 8px;
+}
+
+.chat-message ul {
+  display: grid;
+  gap: 5px;
+  padding-left: 18px;
+}
+
+.chat-message li {
+  padding-left: 2px;
+}
+
+.chat-message strong {
+  font-weight: 800;
+}
+
+.chat-subhead {
+  display: block;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.chat-message.assistant {
+  background: #f3f6ef;
+}
+
+.chat-message.user {
+  background: #161a1d;
+  border-color: #161a1d;
+  color: #f7faf4;
+  justify-self: end;
+  max-width: 86%;
+}
+
+.chat-error {
+  background: color-mix(in oklch, var(--bad) 10%, white);
+  border: 1px solid color-mix(in oklch, var(--bad) 30%, var(--line));
+  border-radius: 7px;
+  color: var(--bad);
+  font-weight: 700;
+  padding: 10px;
+}
+
+.chat-form {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-form textarea {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  line-height: 1.45;
+  min-height: 78px;
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.chat-form button {
+  justify-self: end;
+  min-width: 92px;
+}
+
+.chat-form button:disabled,
+.chat-suggestions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .pulse-shell {
@@ -1806,9 +2421,33 @@ tbody tr:hover,
   }
 
   .dashboard,
+  .weekly-summary-panel,
   .latest-panel,
   .pulse-hero {
     grid-template-columns: 1fr;
+  }
+
+  .summary-overview-row,
+  .summary-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-metrics-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-change-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-attribution {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .source-panel {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .pulse-cards,
@@ -1826,7 +2465,15 @@ tbody tr:hover,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .transition-block.compact {
+    grid-template-columns: 1fr;
+  }
+
   .method-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .endpoint-list {
     grid-template-columns: 1fr;
   }
 }
@@ -1851,7 +2498,12 @@ tbody tr:hover,
     width: 100%;
   }
 
-  .latest-metrics {
+  .latest-metrics,
+  .summary-metrics-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-change-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1893,6 +2545,16 @@ tbody tr:hover,
 
   .legend-tooltip {
     width: 270px;
+  }
+
+  .chat-launcher {
+    bottom: 14px;
+    right: 14px;
+  }
+
+  .chat-panel {
+    bottom: 66px;
+    right: 12px;
   }
 
   .pulse-anchor-metrics,

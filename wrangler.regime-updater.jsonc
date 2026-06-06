@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "regimealpha-updater",
+  "main": "workers/regime-updater.js",
+  "compatibility_date": "2026-05-23",
+  "workers_dev": true,
+  "triggers": {
+    "crons": ["40 23 * * 1-5"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "REGIME_KV",
+      "id": "fe3bc31a03de42deabe70a988717e313"
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "regimealpha.chenzixin.uk/data/regimes.json",
+      "zone_name": "chenzixin.uk"
+    },
+    {
+      "pattern": "regimealpha.chenzixin.uk/api/regime-update/*",
+      "zone_name": "chenzixin.uk"
+    }
+  ]
+}
