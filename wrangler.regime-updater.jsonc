@@ -15,10 +15,6 @@
   ],
   "routes": [
     {
-      "pattern": "regimealpha.chenzixin.uk/data/regimes.json",
-      "zone_name": "chenzixin.uk"
-    },
-    {
       "pattern": "regimealpha.chenzixin.uk/api/regime-update/*",
       "zone_name": "chenzixin.uk"
     }

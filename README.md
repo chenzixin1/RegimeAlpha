@@ -32,9 +32,9 @@ FMP_API_KEY="your_key_here" npm run update:data:refresh
 
 ## Cloudflare Worker 自动更新
 
-正式站点可以由 `regimealpha-updater` Worker 定时刷新数据。Worker 每周二到周六北京时间 07:40 运行一次，触发 GitHub Actions 工作流；Actions 在 Node 环境里只拉取最近一段 FMP 历史行情，重算尾部窗口，再把结果拼回完整 `regimes.json` 并发布回 Worker，由 Worker 写入 Cloudflare KV `regimealpha_regime_data`。
+正式站点可以由 `regimealpha-updater` Worker 定时触发数据刷新。Worker 每周二到周六北京时间 07:40 运行一次，触发 GitHub Actions 工作流；Actions 在 Node 环境里只拉取最近一段 FMP 历史行情，重算尾部窗口，重新构建 Pages，并把最新 `data/regimes.json` 与 `public/data/regimes.json` 提交回 `main`。
 
-站点加载时会先使用构建时内置的静态数据，然后在浏览器端请求 `/data/regimes.json`；该路径由 Worker 路由接管并返回 KV 中的最新数据。这样每日数据推进不再需要重新部署 Pages。
+站点加载时会先使用构建时内置的静态数据，然后在浏览器端请求 Pages 静态文件 `/data/regimes.json`。`regimealpha-updater` 只接管 `/api/regime-update/*`，不接管 `/data/regimes.json`，避免大 JSON 经过 Worker/KV 动态响应变慢。
 
 常用命令：
 
