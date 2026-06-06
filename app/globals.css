@@ -305,7 +305,6 @@ h1 {
   grid-template-rows: auto minmax(158px, 1fr) auto;
   min-height: 316px;
   min-width: 0;
-  overflow: hidden;
   padding: 14px;
   position: relative;
 }
@@ -605,6 +604,18 @@ td.warn {
 .summary-change-card:nth-child(n + 3) .metric-tooltip {
   left: auto;
   right: 12px;
+}
+
+.summary-change-card .metric-tooltip {
+  inline-size: min(320px, calc(100% - 28px));
+  left: 14px;
+  top: 48px;
+  z-index: 90;
+}
+
+.summary-change-card:nth-child(n + 3) .metric-tooltip {
+  left: auto;
+  right: 14px;
 }
 
 .metric:hover .metric-tooltip,
