@@ -90,13 +90,20 @@ function compactMarketRow(row) {
   return {
     weekEnd: row.weekEnd,
     code: row.code,
+    baselineCode: row.baselineCode,
+    baselineLabelZh: row.baselineLabelZh,
     labelZh: row.labelZh,
     label: row.label,
     confidence: row.confidence,
+    transition: compactTransition(row.transition),
     thesis: row.thesis,
     drivers: row.drivers || [],
     metrics: pickMetrics(row.metrics, [
       "weeklyReturn",
+      "spyOpen",
+      "spyHigh",
+      "spyLow",
+      "spyClose",
       "ret4w",
       "ret13w",
       "realizedVol20",
@@ -104,7 +111,13 @@ function compactMarketRow(row) {
       "sectorCorrelation20",
       "equityBondCorrelation63",
       "drawdown52w",
-      "trendEfficiency20"
+      "trendEfficiency20",
+      "maxDownDailyReturn",
+      "downVolumeZ20",
+      "downVolumeZ63",
+      "distributionDay",
+      "distributionDate",
+      "shockDownDay"
     ])
   };
 }
@@ -116,9 +129,11 @@ function compactAsset(asset) {
     name: asset.name,
     group: asset.group,
     code: asset.code,
+    baselineCode: asset.baselineCode,
     labelZh: asset.labelZh,
     label: asset.label,
     confidence: asset.confidence,
+    transition: compactTransition(asset.transition),
     weeklyReturn: asset.weeklyReturn,
     ret13w: asset.ret13w,
     relativeToSpy13w: asset.relativeToSpy13w,
@@ -136,9 +151,12 @@ function compactAssetRow(row) {
     name: row.name,
     group: row.group,
     code: row.code,
+    baselineCode: row.baselineCode,
+    baselineLabelZh: row.baselineLabelZh,
     labelZh: row.labelZh,
     label: row.label,
     confidence: row.confidence,
+    transition: compactTransition(row.transition),
     thesis: row.thesis,
     drivers: row.drivers || [],
     metrics: pickMetrics(row.metrics, [
@@ -152,6 +170,12 @@ function compactAssetRow(row) {
       "trendEfficiency20",
       "weekRange",
       "maxAbsDailyReturn",
+      "maxDownDailyReturn",
+      "downVolumeZ20",
+      "downVolumeZ63",
+      "distributionDay",
+      "distributionDate",
+      "shockDownDay",
       "drawdown52w",
       "marketCode",
       "marketLabelZh"
@@ -161,6 +185,19 @@ function compactAssetRow(row) {
 
 function pickMetrics(metrics = {}, keys) {
   return Object.fromEntries(keys.map((key) => [key, metrics[key]]).filter(([, value]) => value !== undefined));
+}
+
+function compactTransition(transition) {
+  if (!transition) return undefined;
+  return {
+    pressure: transition.pressure,
+    status: transition.status,
+    switched: transition.switched,
+    likelyNext: transition.likelyNext,
+    likelyNextLabelZh: transition.likelyNextLabelZh,
+    probabilities: transition.probabilities,
+    triggers: transition.triggers || []
+  };
 }
 
 function clampInt(value, min, max, fallback) {

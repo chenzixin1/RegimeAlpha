@@ -11,6 +11,7 @@
     "deploy:worker": "wrangler deploy --config wrangler.regime-updater.jsonc",
     "deploy:mcp": "wrangler deploy --config wrangler.regime-mcp.jsonc",
     "start": "next start",
+    "test": "node --test",
     "update:data": "node scripts/build-regimes.mjs",
     "update:data:incremental": "REGIME_INCREMENTAL=1 node scripts/build-regimes.mjs",
     "update:data:refresh": "REGIME_REFRESH=1 node scripts/build-regimes.mjs",

@@ -1,6 +1,7 @@
 import { ARTICLE_CHUNKS, ARTICLE_PDF_PATH, ARTICLE_TITLE } from "../_data/articleContext.js";
 
-const MODEL = "google/gemini-3.5-flash";
+const DEFAULT_MODEL = "google/gemini-2.5-flash";
+const FALLBACK_MODELS = ["openrouter/auto", "google/gemini-3.5-flash"];
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 export async function onRequestPost({ request, env }) {
@@ -28,17 +29,22 @@ export async function onRequestPost({ request, env }) {
 
   const openRouterMessages = buildOpenRouterMessages(messages, question, marketContext, articleContext);
   let answer;
+  let model = env.OPENROUTER_MODEL || DEFAULT_MODEL;
   try {
-    let payload = await callOpenRouter(env, openRouterMessages);
+    let result = await callOpenRouterWithFallback(env, openRouterMessages);
+    let payload = result.payload;
+    model = result.model;
     answer = payload?.choices?.[0]?.message?.content;
     if (isIncompleteAnswer(answer)) {
-      payload = await callOpenRouter(env, [
+      result = await callOpenRouterWithFallback(env, [
         ...openRouterMessages,
         {
           role: "user",
           content: "上一次回答明显不完整或太短。请重新输出完整中文分析：必须有结论、当前状态、因果链、期权框架、触发/失效条件和下一步确认。不要只写开头。"
         }
       ]);
+      payload = result.payload;
+      model = result.model;
       answer = payload?.choices?.[0]?.message?.content;
     }
   } catch (error) {
@@ -51,7 +57,7 @@ export async function onRequestPost({ request, env }) {
 
   return json({
     answer,
-    model: MODEL,
+    model,
     articleTitle: ARTICLE_TITLE,
     articlePdf: ARTICLE_PDF_PATH,
     dataThrough: marketData?.metadata?.dataThrough || null
@@ -99,7 +105,28 @@ function buildOpenRouterMessages(messages, question, marketContext, articleConte
   ];
 }
 
-async function callOpenRouter(env, messages) {
+async function callOpenRouterWithFallback(env, messages) {
+  const candidates = [env.OPENROUTER_MODEL || DEFAULT_MODEL, ...FALLBACK_MODELS].filter(Boolean);
+  const uniqueCandidates = [...new Set(candidates)];
+  let lastError;
+  for (const model of uniqueCandidates) {
+    try {
+      const payload = await callOpenRouter(env, messages, model);
+      return { payload, model };
+    } catch (error) {
+      lastError = error;
+      if (!shouldTryFallback(error)) break;
+    }
+  }
+  throw lastError || new Error("OpenRouter request failed.");
+}
+
+function shouldTryFallback(error) {
+  const message = String(error?.message || "");
+  return /not available|model|provider|region|403|404|429|502|503/i.test(message);
+}
+
+async function callOpenRouter(env, messages, model) {
   const upstream = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -109,7 +136,7 @@ async function callOpenRouter(env, messages) {
       "x-title": "RegimeAlpha"
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       temperature: 0.2,
       max_tokens: 2600,
       reasoning: {

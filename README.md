@@ -1,6 +1,6 @@
 # RegimeAlpha
 
-周度美股 regime 标注网页，基于用户提供的 PDF 策略框架和 Financial Modeling Prep 历史行情数据生成。技术栈采用 Next.js App Router，方便后续部署到 Vercel。
+周度美股 regime 标注网页，基于用户提供的 PDF 策略框架和 Financial Modeling Prep 历史行情数据生成。技术栈采用 Next.js App Router，生产站点固定部署到 Cloudflare Pages 自定义域：`https://regimealpha.chenzixin.uk/`。
 
 ## 运行
 
@@ -21,7 +21,7 @@ FMP_API_KEY="your_key_here" npm run update:data:refresh
 
 ## 数据口径
 
-- 标的代理：`SPY` 代表美股大盘，`^VIX` 代表隐含波动，`TLT` 代表长久期债券，`QQQ`/`IWM`/行业 ETF 用于趋势、广度和相关性近似。
+- 标的代理：`SPY` 代表美股大盘，`^VIX` 代表隐含波动，`TLT` 代表长久期债券，`QQQ`/`IWM`/行业 ETF 用于趋势、广度和相关性近似；`EWY`、`^KS11`、`^N225` 用于韩国 ETF、KOSPI 和日经指数观察。
 - 频率：日线聚合为周线，输出过去五年每个有交易数据的星期。
 - 模型：规则型 regime classifier，使用 PDF 中的方向漂移、实现波动、相关性、VIX、股债相关和微观结构冲击等维度。
 - 行业分化：市场 regime 仍以 `SPY` 标注；sector/industry proxy 会单独标注自己的 regime，使用各自收益、波动、趋势效率、相对 SPY 强弱、回撤和相关性。`SOX` 目前用 `SOXX` 作为半导体代理，因为 FMP EOD 对 `^SOX` 没有返回历史日线。
@@ -32,7 +32,7 @@ FMP_API_KEY="your_key_here" npm run update:data:refresh
 
 ## Cloudflare Worker 自动更新
 
-正式站点现在可以由 `regimealpha-updater` Worker 定时刷新数据。Worker 每周二到周六北京时间 07:40 运行一次，触发 GitHub Actions 工作流；Actions 在 Node 环境里只拉取最近一段 FMP 历史行情，重算尾部窗口，再把结果拼回完整 `regimes.json` 并发布回 Worker，由 Worker 写入 Cloudflare KV `regimealpha_regime_data`。
+正式站点可以由 `regimealpha-updater` Worker 定时刷新数据。Worker 每周二到周六北京时间 07:40 运行一次，触发 GitHub Actions 工作流；Actions 在 Node 环境里只拉取最近一段 FMP 历史行情，重算尾部窗口，再把结果拼回完整 `regimes.json` 并发布回 Worker，由 Worker 写入 Cloudflare KV `regimealpha_regime_data`。
 
 站点加载时会先使用构建时内置的静态数据，然后在浏览器端请求 `/data/regimes.json`；该路径由 Worker 路由接管并返回 KV 中的最新数据。这样每日数据推进不再需要重新部署 Pages。
 
@@ -54,11 +54,28 @@ GitHub Actions 需要两个 repository secret：
 
 日常自动任务使用 `npm run update:data:incremental`，默认只重算最近约 120 天的周度输出，并为 52 周回撤、200 日均线、相关性等指标向前补取约 460 天上下文；`npm run update:data` 仍保留为全量 5 年兜底重建。
 
-## 原文 PDF 与研究助手
+## 盘中 Pulse
 
-首页包含原始文章 PDF 入口：`/articles/market-regime-transition-probability-study.pdf`。右下角的研究助手通过 Cloudflare Pages Function `/api/chat` 调用 OpenRouter `google/gemini-3.5-flash`，结合原文摘录和 `/data/regimes.json` 最新数据回答问题。
+`/pulse` 是独立的盘中敏感预警页，不改写正式周度 regime。页面打开后会每 60 秒请求一次 `/api/pulse`；没有用户访问 `/pulse` 时，不会有后台 cron 或常驻任务主动拉取 FMP。
 
-Pages 生产环境需要配置：
+`/api/pulse` 由 Cloudflare Pages Function 提供，从部署环境变量读取 `FMP_API_KEY`，前端不会接触密钥。函数进程内有 60 秒内存缓存，同一边缘实例的重复请求会复用最近一次 FMP 结果；如果未来公开给大量用户访问，再考虑加 Cloudflare KV 做跨实例共享缓存。
+
+盘中页包含两组主题 watchlist：
+
+- 存储链条：`DRAM`、`MU`、`SNDK`、`000660.KS`、`005930.KS`、`WDC`、`STX`。
+- 光通信链条：`AAOI`、`LITE`、`COHR`、`CIEN`、`FN`、`MTSI`、`CRDO`、`MRVL`，并把 `AVGO`、`NOK`、`CSCO`、`SMTC` 标为间接暴露。
+
+为控制 API 压力，主题 watchlist 主要使用 batch quote；5 分钟 K 线只给核心指数和少数主题锚点。
+
+## 原文、中文摘译与研究助手
+
+首页包含三类研究入口：
+
+- 原始 PDF 下载：`/articles/market-regime-transition-probability-study.pdf`
+- 中文摘译下载：`/articles/market-regime-transition-probability-study.zh.md`
+- 右下角研究助手：Cloudflare Pages Function `/api/chat`
+
+研究助手通过 OpenRouter 调用 `google/gemini-2.5-flash`，并在模型或区域不可用时 fallback 到 `openrouter/auto`；回答会结合文章摘录、当前 `/data/regimes.json` 和页面选中的 week/asset。Pages 生产环境需要配置：
 
 - `OPENROUTER_API_KEY`：OpenRouter 调用密钥。
 
@@ -105,6 +122,16 @@ REGIME_MCP_URL=https://regimealpha.chenzixin.uk/mcp npm run verify:mcp-strategy
 ```bash
 npm run deploy:mcp
 ```
+
+## GitHub 自动刷新
+
+仓库包含 `.github/workflows/daily-data-refresh.yml`，会在工作日 22:30 UTC 运行，也可以在 GitHub Actions 页面手动触发。流程会强制刷新 FMP 数据、执行静态构建、比较 `metadata.dataThrough`，只有数据日期推进时才部署 Cloudflare Pages 并提交 `data/regimes.json` 与 `public/data/regimes.json`。
+
+GitHub Secrets 需要配置：
+
+- `FMP_API_KEY`：Financial Modeling Prep 数据密钥。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare account ID。
+- `CLOUDFLARE_API_TOKEN`：有 Cloudflare Pages 写权限的 API token。
 
 ## Vercel 口径
 
