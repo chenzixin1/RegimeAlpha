@@ -1,0 +1,95 @@
+name: RegimeAlpha daily data refresh
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run after the US close, with enough delay for end-of-day data vendors.
+    - cron: "30 22 * * 1-5"
+
+concurrency:
+  group: regimealpha-daily-data-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Read previous dataThrough
+        id: before
+        run: |
+          DATA_THROUGH=$(node <<'NODE'
+          const d = require("./data/regimes.json");
+          console.log(d.metadata?.dataThrough || "");
+          NODE
+          )
+          echo "data_through=$DATA_THROUGH" >> "$GITHUB_OUTPUT"
+
+      - name: Build static site with refreshed data
+        env:
+          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          REGIME_REFRESH: "1"
+        run: npm run build
+
+      - name: Decide whether data advanced
+        id: freshness
+        env:
+          BEFORE: ${{ steps.before.outputs.data_through }}
+        run: |
+          AFTER=$(node <<'NODE'
+          const d = require("./data/regimes.json");
+          console.log(d.metadata?.dataThrough || "");
+          NODE
+          )
+          echo "data_through=$AFTER" >> "$GITHUB_OUTPUT"
+          export AFTER
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const before = process.env.BEFORE || "";
+          const after = process.env.AFTER || "";
+          const advanced = Boolean(after) && (!before || after > before);
+          console.log(`advanced=${advanced}`);
+          NODE
+
+      - name: Restore generated data when no newer market data exists
+        if: steps.freshness.outputs.advanced != 'true'
+        run: |
+          git checkout -- data/regimes.json public/data/regimes.json
+          echo "No newer market data. dataThrough stayed at ${{ steps.before.outputs.data_through }}."
+
+      - name: Deploy to Cloudflare Pages
+        if: steps.freshness.outputs.advanced == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx wrangler pages deploy out --project-name regimealpha --branch main
+
+      - name: Commit refreshed JSON
+        if: steps.freshness.outputs.advanced == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/regimes.json public/data/regimes.json
+          if git diff --cached --quiet; then
+            echo "Data advanced, but tracked JSON is unchanged."
+            exit 0
+          fi
+          git commit -m "Update regime data to ${{ steps.freshness.outputs.data_through }}"
+          git push

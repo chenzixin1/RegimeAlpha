@@ -30,6 +30,29 @@ FMP_API_KEY="your_key_here" npm run update:data:refresh
 - 前端数据：脚本同时输出 `data/regimes.json` 和 `public/data/regimes.json`，页面不直接调用 FMP。
 - 密钥：脚本只从 `FMP_API_KEY` 环境变量读取，前端源码不包含 API key。
 
+## 盘中 Pulse
+
+`/pulse` 是独立的盘中敏感预警页，不改写正式周度 regime。页面打开后会每 60 秒请求一次 `/api/pulse`；没有用户访问 `/pulse` 时，不会有后台 cron 或常驻任务主动拉取 FMP。
+
+`/api/pulse` 由 Cloudflare Pages Function 提供，从部署环境变量读取 `FMP_API_KEY`，前端不会接触密钥。函数进程内有 60 秒内存缓存，同一边缘实例的重复请求会复用最近一次 FMP 结果；如果未来公开给大量用户访问，再考虑加 Cloudflare KV 做跨实例共享缓存。
+
+盘中页包含两组主题 watchlist：
+
+- 存储链条：`DRAM`、`MU`、`SNDK`、`000660.KS`、`005930.KS`、`WDC`、`STX`。
+- 光通信链条：`AAOI`、`LITE`、`COHR`、`CIEN`、`FN`、`MTSI`、`CRDO`、`MRVL`，并把 `AVGO`、`NOK`、`CSCO`、`SMTC` 标为间接暴露。
+
+为控制 API 压力，主题 watchlist 主要使用 batch quote；5 分钟 K 线只给核心指数和少数主题锚点。
+
 ## Vercel 口径
 
 当前设计对 Vercel 友好：构建阶段运行 `npm run update:data`，运行时页面读取随部署产物一起发布的 JSON。Vercel Serverless 文件系统不适合持久写入 SQLite；如果后续要做线上定时刷新，应把缓存适配层替换为 Vercel KV/Postgres 或 Turso/libSQL，并把 `FMP_API_KEY` 配到 Vercel 环境变量。
+
+## GitHub 自动刷新
+
+仓库包含 `.github/workflows/daily-data-refresh.yml`，会在工作日 22:30 UTC 运行，也可以在 GitHub Actions 页面手动触发。流程会强制刷新 FMP 数据、执行静态构建、比较 `metadata.dataThrough`，只有数据日期推进时才部署 Cloudflare Pages 并提交 `data/regimes.json` 与 `public/data/regimes.json`。
+
+GitHub Secrets 需要配置：
+
+- `FMP_API_KEY`：Financial Modeling Prep 数据密钥。
+- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare account ID。
+- `CLOUDFLARE_API_TOKEN`：有 Cloudflare Pages 写权限的 API token。
