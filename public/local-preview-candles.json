@@ -1,0 +1,1326 @@
+{
+  "weekStart": "2026-06-15",
+  "weekEnd": "2026-06-18",
+  "candles": {
+    "XLF": {
+      "open": 53.76,
+      "high": 54.89,
+      "low": 53.46,
+      "close": 53.57,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 53.76,
+          "high": 53.97,
+          "low": 53.48,
+          "close": 53.56,
+          "previousClose": 53.34,
+          "dailyReturn": 0.00412
+        },
+        {
+          "date": "2026-06-16",
+          "open": 54.01,
+          "high": 54.43,
+          "low": 53.85,
+          "close": 54.35,
+          "previousClose": 53.56,
+          "dailyReturn": 0.01475
+        },
+        {
+          "date": "2026-06-17",
+          "open": 54.29,
+          "high": 54.89,
+          "low": 53.9,
+          "close": 54.05,
+          "previousClose": 54.35,
+          "dailyReturn": -0.00552
+        },
+        {
+          "date": "2026-06-18",
+          "open": 54.55,
+          "high": 54.61,
+          "low": 53.46,
+          "close": 53.57,
+          "previousClose": 54.05,
+          "dailyReturn": -0.00888
+        }
+      ]
+    },
+    "SPY": {
+      "open": 751.85,
+      "high": 756.68,
+      "low": 739.22,
+      "close": 746.74,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 751.85,
+          "high": 756.68,
+          "low": 751.76,
+          "close": 754.83,
+          "previousClose": 741.75,
+          "dailyReturn": 0.01763
+        },
+        {
+          "date": "2026-06-16",
+          "open": 754.55,
+          "high": 755.44,
+          "low": 749.88,
+          "close": 750.33,
+          "previousClose": 754.83,
+          "dailyReturn": -0.00596
+        },
+        {
+          "date": "2026-06-17",
+          "open": 751.29,
+          "high": 752.15,
+          "low": 739.22,
+          "close": 740.96,
+          "previousClose": 750.33,
+          "dailyReturn": -0.01249
+        },
+        {
+          "date": "2026-06-18",
+          "open": 747.76,
+          "high": 748.23,
+          "low": 743.86,
+          "close": 746.74,
+          "previousClose": 740.96,
+          "dailyReturn": 0.0078
+        }
+      ]
+    },
+    "XLE": {
+      "open": 55.2,
+      "high": 56.05,
+      "low": 53.25,
+      "close": 53.77,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 55.2,
+          "high": 56.05,
+          "low": 55.02,
+          "close": 55.55,
+          "previousClose": 57.55,
+          "dailyReturn": -0.03475
+        },
+        {
+          "date": "2026-06-16",
+          "open": 55,
+          "high": 55.48,
+          "low": 54.95,
+          "close": 55.36,
+          "previousClose": 55.55,
+          "dailyReturn": -0.00342
+        },
+        {
+          "date": "2026-06-17",
+          "open": 55.26,
+          "high": 55.36,
+          "low": 54.54,
+          "close": 54.67,
+          "previousClose": 55.36,
+          "dailyReturn": -0.01246
+        },
+        {
+          "date": "2026-06-18",
+          "open": 54.14,
+          "high": 54.25,
+          "low": 53.25,
+          "close": 53.77,
+          "previousClose": 54.67,
+          "dailyReturn": -0.01646
+        }
+      ]
+    },
+    "XLK": {
+      "open": 190.37,
+      "high": 192.25,
+      "low": 185.3,
+      "close": 191.44,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 190.37,
+          "high": 192.08,
+          "low": 189.75,
+          "close": 191.79,
+          "previousClose": 184.8,
+          "dailyReturn": 0.03782
+        },
+        {
+          "date": "2026-06-16",
+          "open": 191.23,
+          "high": 192.25,
+          "low": 186.43,
+          "close": 186.44,
+          "previousClose": 191.79,
+          "dailyReturn": -0.0279
+        },
+        {
+          "date": "2026-06-17",
+          "open": 189.01,
+          "high": 189.99,
+          "low": 185.3,
+          "close": 185.8,
+          "previousClose": 186.44,
+          "dailyReturn": -0.00343
+        },
+        {
+          "date": "2026-06-18",
+          "open": 190.42,
+          "high": 192,
+          "low": 189.38,
+          "close": 191.44,
+          "previousClose": 185.8,
+          "dailyReturn": 0.03036
+        }
+      ]
+    },
+    "QQQ": {
+      "open": 738.1,
+      "high": 744.76,
+      "low": 720.85,
+      "close": 740.62,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 738.1,
+          "high": 744.76,
+          "low": 737.38,
+          "close": 744,
+          "previousClose": 721.34,
+          "dailyReturn": 0.03141
+        },
+        {
+          "date": "2026-06-16",
+          "open": 742.25,
+          "high": 744.22,
+          "low": 729.64,
+          "close": 729.86,
+          "previousClose": 744,
+          "dailyReturn": -0.01901
+        },
+        {
+          "date": "2026-06-17",
+          "open": 735.19,
+          "high": 735.68,
+          "low": 720.85,
+          "close": 722.51,
+          "previousClose": 729.86,
+          "dailyReturn": -0.01007
+        },
+        {
+          "date": "2026-06-18",
+          "open": 737.2,
+          "high": 741.82,
+          "low": 732.51,
+          "close": 740.62,
+          "previousClose": 722.51,
+          "dailyReturn": 0.02507
+        }
+      ]
+    },
+    "XLU": {
+      "open": 44.48,
+      "high": 45.5,
+      "low": 44.19,
+      "close": 44.76,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 44.48,
+          "high": 45,
+          "low": 44.19,
+          "close": 44.74,
+          "previousClose": 44.53,
+          "dailyReturn": 0.00472
+        },
+        {
+          "date": "2026-06-16",
+          "open": 44.84,
+          "high": 45.5,
+          "low": 44.76,
+          "close": 45.06,
+          "previousClose": 44.74,
+          "dailyReturn": 0.00715
+        },
+        {
+          "date": "2026-06-17",
+          "open": 44.82,
+          "high": 45.17,
+          "low": 44.24,
+          "close": 44.46,
+          "previousClose": 45.06,
+          "dailyReturn": -0.01332
+        },
+        {
+          "date": "2026-06-18",
+          "open": 44.6,
+          "high": 45.34,
+          "low": 44.53,
+          "close": 44.76,
+          "previousClose": 44.46,
+          "dailyReturn": 0.00675
+        }
+      ]
+    },
+    "XLI": {
+      "open": 178.8,
+      "high": 182.92,
+      "low": 178.51,
+      "close": 180.91,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 178.8,
+          "high": 179.98,
+          "low": 178.51,
+          "close": 178.68,
+          "previousClose": 176.18,
+          "dailyReturn": 0.01419
+        },
+        {
+          "date": "2026-06-16",
+          "open": 179.58,
+          "high": 181.1,
+          "low": 179.31,
+          "close": 179.85,
+          "previousClose": 178.68,
+          "dailyReturn": 0.00655
+        },
+        {
+          "date": "2026-06-17",
+          "open": 179.97,
+          "high": 182.33,
+          "low": 179.13,
+          "close": 179.6,
+          "previousClose": 179.85,
+          "dailyReturn": -0.00139
+        },
+        {
+          "date": "2026-06-18",
+          "open": 182.5,
+          "high": 182.92,
+          "low": 180.45,
+          "close": 180.91,
+          "previousClose": 179.6,
+          "dailyReturn": 0.00729
+        }
+      ]
+    },
+    "XLB": {
+      "open": 52.87,
+      "high": 53.31,
+      "low": 51.76,
+      "close": 51.81,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 52.87,
+          "high": 53.2,
+          "low": 52.47,
+          "close": 52.5,
+          "previousClose": 52.18,
+          "dailyReturn": 0.00613
+        },
+        {
+          "date": "2026-06-16",
+          "open": 52.69,
+          "high": 53.09,
+          "low": 52.64,
+          "close": 52.72,
+          "previousClose": 52.5,
+          "dailyReturn": 0.00419
+        },
+        {
+          "date": "2026-06-17",
+          "open": 52.52,
+          "high": 53.31,
+          "low": 51.86,
+          "close": 52.02,
+          "previousClose": 52.72,
+          "dailyReturn": -0.01328
+        },
+        {
+          "date": "2026-06-18",
+          "open": 52.22,
+          "high": 52.43,
+          "low": 51.76,
+          "close": 51.81,
+          "previousClose": 52.02,
+          "dailyReturn": -0.00404
+        }
+      ]
+    },
+    "XLV": {
+      "open": 153.71,
+      "high": 153.88,
+      "low": 148.79,
+      "close": 149.4,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 153.71,
+          "high": 153.88,
+          "low": 151.76,
+          "close": 152.89,
+          "previousClose": 153.81,
+          "dailyReturn": -0.00598
+        },
+        {
+          "date": "2026-06-16",
+          "open": 153.6,
+          "high": 153.72,
+          "low": 151.72,
+          "close": 152.94,
+          "previousClose": 152.89,
+          "dailyReturn": 0.00033
+        },
+        {
+          "date": "2026-06-17",
+          "open": 152.05,
+          "high": 152.57,
+          "low": 149.97,
+          "close": 150.71,
+          "previousClose": 152.94,
+          "dailyReturn": -0.01458
+        },
+        {
+          "date": "2026-06-18",
+          "open": 151.27,
+          "high": 151.27,
+          "low": 148.79,
+          "close": 149.4,
+          "previousClose": 150.71,
+          "dailyReturn": -0.00869
+        }
+      ]
+    },
+    "XLRE": {
+      "open": 45.32,
+      "high": 45.65,
+      "low": 43.83,
+      "close": 43.86,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 45.32,
+          "high": 45.65,
+          "low": 44.87,
+          "close": 44.99,
+          "previousClose": 45.36,
+          "dailyReturn": -0.00816
+        },
+        {
+          "date": "2026-06-16",
+          "open": 45.21,
+          "high": 45.46,
+          "low": 44.96,
+          "close": 45.1,
+          "previousClose": 44.99,
+          "dailyReturn": 0.00244
+        },
+        {
+          "date": "2026-06-17",
+          "open": 44.96,
+          "high": 45.06,
+          "low": 43.85,
+          "close": 43.97,
+          "previousClose": 45.1,
+          "dailyReturn": -0.02506
+        },
+        {
+          "date": "2026-06-18",
+          "open": 44.38,
+          "high": 44.38,
+          "low": 43.83,
+          "close": 43.86,
+          "previousClose": 43.97,
+          "dailyReturn": -0.0025
+        }
+      ]
+    },
+    "XLC": {
+      "open": 111.92,
+      "high": 112.59,
+      "low": 108.51,
+      "close": 109.45,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 111.92,
+          "high": 112.59,
+          "low": 111.59,
+          "close": 112.19,
+          "previousClose": 111.65,
+          "dailyReturn": 0.00484
+        },
+        {
+          "date": "2026-06-16",
+          "open": 112.24,
+          "high": 112.59,
+          "low": 111.41,
+          "close": 112.32,
+          "previousClose": 112.19,
+          "dailyReturn": 0.00116
+        },
+        {
+          "date": "2026-06-17",
+          "open": 111.48,
+          "high": 111.49,
+          "low": 109.02,
+          "close": 109.2,
+          "previousClose": 112.32,
+          "dailyReturn": -0.02778
+        },
+        {
+          "date": "2026-06-18",
+          "open": 109.86,
+          "high": 110.37,
+          "low": 108.51,
+          "close": 109.45,
+          "previousClose": 109.2,
+          "dailyReturn": 0.00229
+        }
+      ]
+    },
+    "SOXX": {
+      "open": 622.61,
+      "high": 644.43,
+      "low": 590.63,
+      "close": 639.45,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 622.61,
+          "high": 629.72,
+          "low": 618.45,
+          "close": 628.45,
+          "previousClose": 596.25,
+          "dailyReturn": 0.054
+        },
+        {
+          "date": "2026-06-16",
+          "open": 623.84,
+          "high": 629.64,
+          "low": 590.63,
+          "close": 591.24,
+          "previousClose": 628.45,
+          "dailyReturn": -0.05921
+        },
+        {
+          "date": "2026-06-17",
+          "open": 611.56,
+          "high": 621.99,
+          "low": 598.95,
+          "close": 599.73,
+          "previousClose": 591.24,
+          "dailyReturn": 0.01436
+        },
+        {
+          "date": "2026-06-18",
+          "open": 626.52,
+          "high": 644.43,
+          "low": 626.15,
+          "close": 639.45,
+          "previousClose": 599.73,
+          "dailyReturn": 0.06623
+        }
+      ]
+    },
+    "IGV": {
+      "open": 92.18,
+      "high": 93.63,
+      "low": 87.3,
+      "close": 89.09,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 92.18,
+          "high": 93.63,
+          "low": 91.6,
+          "close": 92.68,
+          "previousClose": 90.7,
+          "dailyReturn": 0.02183
+        },
+        {
+          "date": "2026-06-16",
+          "open": 92.28,
+          "high": 92.98,
+          "low": 90.87,
+          "close": 91.37,
+          "previousClose": 92.68,
+          "dailyReturn": -0.01413
+        },
+        {
+          "date": "2026-06-17",
+          "open": 90.84,
+          "high": 92.11,
+          "low": 89.03,
+          "close": 89.16,
+          "previousClose": 91.37,
+          "dailyReturn": -0.02419
+        },
+        {
+          "date": "2026-06-18",
+          "open": 89.56,
+          "high": 89.56,
+          "low": 87.3,
+          "close": 89.09,
+          "previousClose": 89.16,
+          "dailyReturn": -0.00079
+        }
+      ]
+    },
+    "XLY": {
+      "open": 118.61,
+      "high": 119.51,
+      "low": 115.18,
+      "close": 117.16,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 118.61,
+          "high": 119.51,
+          "low": 118.31,
+          "close": 118.57,
+          "previousClose": 116.6,
+          "dailyReturn": 0.0169
+        },
+        {
+          "date": "2026-06-16",
+          "open": 118.67,
+          "high": 119.46,
+          "low": 118.34,
+          "close": 118.46,
+          "previousClose": 118.57,
+          "dailyReturn": -0.00093
+        },
+        {
+          "date": "2026-06-17",
+          "open": 117.81,
+          "high": 118.17,
+          "low": 115.18,
+          "close": 115.49,
+          "previousClose": 118.46,
+          "dailyReturn": -0.02507
+        },
+        {
+          "date": "2026-06-18",
+          "open": 116.65,
+          "high": 117.66,
+          "low": 115.54,
+          "close": 117.16,
+          "previousClose": 115.49,
+          "dailyReturn": 0.01446
+        }
+      ]
+    },
+    "DRAM": {
+      "open": 69.64,
+      "high": 77.7,
+      "low": 67.6,
+      "close": 76.71,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 69.64,
+          "high": 71.18,
+          "low": 68.76,
+          "close": 71.07,
+          "previousClose": 65.01,
+          "dailyReturn": 0.09322
+        },
+        {
+          "date": "2026-06-16",
+          "open": 71.72,
+          "high": 72.61,
+          "low": 67.6,
+          "close": 68.12,
+          "previousClose": 71.07,
+          "dailyReturn": -0.04151
+        },
+        {
+          "date": "2026-06-17",
+          "open": 71.75,
+          "high": 73.14,
+          "low": 69.61,
+          "close": 69.95,
+          "previousClose": 68.12,
+          "dailyReturn": 0.02686
+        },
+        {
+          "date": "2026-06-18",
+          "open": 75.25,
+          "high": 77.7,
+          "low": 75,
+          "close": 76.71,
+          "previousClose": 69.95,
+          "dailyReturn": 0.09664
+        }
+      ]
+    },
+    "XSW": {
+      "open": 169.85,
+      "high": 170.4,
+      "low": 159.16,
+      "close": 162.54,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 169.85,
+          "high": 170.21,
+          "low": 167.31,
+          "close": 167.7,
+          "previousClose": 166.16,
+          "dailyReturn": 0.00927
+        },
+        {
+          "date": "2026-06-16",
+          "open": 167.34,
+          "high": 170.4,
+          "low": 166.54,
+          "close": 166.92,
+          "previousClose": 167.7,
+          "dailyReturn": -0.00465
+        },
+        {
+          "date": "2026-06-17",
+          "open": 166.29,
+          "high": 167.87,
+          "low": 162.29,
+          "close": 162.29,
+          "previousClose": 166.92,
+          "dailyReturn": -0.02774
+        },
+        {
+          "date": "2026-06-18",
+          "open": 163.19,
+          "high": 163.32,
+          "low": 159.16,
+          "close": 162.54,
+          "previousClose": 162.29,
+          "dailyReturn": 0.00154
+        }
+      ]
+    },
+    "BTCUSD": {
+      "open": 65704.23,
+      "high": 67264,
+      "low": 62159.76,
+      "close": 62879.01,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 65704.23,
+          "high": 67264,
+          "low": 65302.08,
+          "close": 66276.8,
+          "previousClose": 65706.62,
+          "dailyReturn": 0.00868
+        },
+        {
+          "date": "2026-06-16",
+          "open": 66276.79,
+          "high": 66944,
+          "low": 65300.03,
+          "close": 65616.64,
+          "previousClose": 66276.8,
+          "dailyReturn": -0.00996
+        },
+        {
+          "date": "2026-06-17",
+          "open": 65616.64,
+          "high": 66384.01,
+          "low": 63851.02,
+          "close": 64446.04,
+          "previousClose": 65616.64,
+          "dailyReturn": -0.01784
+        },
+        {
+          "date": "2026-06-18",
+          "open": 64446.05,
+          "high": 64752.51,
+          "low": 62159.76,
+          "close": 62879.01,
+          "previousClose": 64446.04,
+          "dailyReturn": -0.02432
+        }
+      ]
+    },
+    "IBB": {
+      "open": 171.14,
+      "high": 176.58,
+      "low": 170.26,
+      "close": 173.64,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 171.14,
+          "high": 172.53,
+          "low": 170.49,
+          "close": 172.17,
+          "previousClose": 170.66,
+          "dailyReturn": 0.00885
+        },
+        {
+          "date": "2026-06-16",
+          "open": 172.06,
+          "high": 172.85,
+          "low": 170.26,
+          "close": 171.44,
+          "previousClose": 172.17,
+          "dailyReturn": -0.00424
+        },
+        {
+          "date": "2026-06-17",
+          "open": 171.69,
+          "high": 175.79,
+          "low": 171.25,
+          "close": 173.44,
+          "previousClose": 171.44,
+          "dailyReturn": 0.01167
+        },
+        {
+          "date": "2026-06-18",
+          "open": 174.82,
+          "high": 176.58,
+          "low": 171.79,
+          "close": 173.64,
+          "previousClose": 173.44,
+          "dailyReturn": 0.00115
+        }
+      ]
+    },
+    "XRT": {
+      "open": 88.54,
+      "high": 89.1,
+      "low": 84.38,
+      "close": 86.39,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 88.54,
+          "high": 89.1,
+          "low": 87.31,
+          "close": 87.44,
+          "previousClose": 87.73,
+          "dailyReturn": -0.00331
+        },
+        {
+          "date": "2026-06-16",
+          "open": 87.63,
+          "high": 88.33,
+          "low": 86.94,
+          "close": 87.08,
+          "previousClose": 87.44,
+          "dailyReturn": -0.00412
+        },
+        {
+          "date": "2026-06-17",
+          "open": 87,
+          "high": 87.41,
+          "low": 84.38,
+          "close": 84.55,
+          "previousClose": 87.08,
+          "dailyReturn": -0.02905
+        },
+        {
+          "date": "2026-06-18",
+          "open": 85.38,
+          "high": 86.7,
+          "low": 85.22,
+          "close": 86.39,
+          "previousClose": 84.55,
+          "dailyReturn": 0.02176
+        }
+      ]
+    },
+    "KRE": {
+      "open": 73.79,
+      "high": 74.27,
+      "low": 70.53,
+      "close": 71.72,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 73.79,
+          "high": 74.27,
+          "low": 72.07,
+          "close": 72.23,
+          "previousClose": 73.41,
+          "dailyReturn": -0.01607
+        },
+        {
+          "date": "2026-06-16",
+          "open": 72.78,
+          "high": 73.29,
+          "low": 72.2,
+          "close": 72.49,
+          "previousClose": 72.23,
+          "dailyReturn": 0.0036
+        },
+        {
+          "date": "2026-06-17",
+          "open": 72.29,
+          "high": 72.93,
+          "low": 70.53,
+          "close": 71.15,
+          "previousClose": 72.49,
+          "dailyReturn": -0.01849
+        },
+        {
+          "date": "2026-06-18",
+          "open": 71.76,
+          "high": 72.3,
+          "low": 71.42,
+          "close": 71.72,
+          "previousClose": 71.15,
+          "dailyReturn": 0.00801
+        }
+      ]
+    },
+    "XME": {
+      "open": 123.58,
+      "high": 124.22,
+      "low": 116.2,
+      "close": 117.02,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 123.58,
+          "high": 124.22,
+          "low": 120.57,
+          "close": 120.63,
+          "previousClose": 120.44,
+          "dailyReturn": 0.00158
+        },
+        {
+          "date": "2026-06-16",
+          "open": 121.18,
+          "high": 122.16,
+          "low": 119.15,
+          "close": 119.33,
+          "previousClose": 120.63,
+          "dailyReturn": -0.01078
+        },
+        {
+          "date": "2026-06-17",
+          "open": 119.24,
+          "high": 122.53,
+          "low": 118.27,
+          "close": 118.39,
+          "previousClose": 119.33,
+          "dailyReturn": -0.00788
+        },
+        {
+          "date": "2026-06-18",
+          "open": 119.22,
+          "high": 119.41,
+          "low": 116.2,
+          "close": 117.02,
+          "previousClose": 118.39,
+          "dailyReturn": -0.01157
+        }
+      ]
+    },
+    "XLP": {
+      "open": 85.47,
+      "high": 86.35,
+      "low": 83.13,
+      "close": 83.3,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 85.47,
+          "high": 85.77,
+          "low": 85.13,
+          "close": 85.48,
+          "previousClose": 85.82,
+          "dailyReturn": -0.00396
+        },
+        {
+          "date": "2026-06-16",
+          "open": 85.79,
+          "high": 86.35,
+          "low": 85.09,
+          "close": 85.59,
+          "previousClose": 85.48,
+          "dailyReturn": 0.00129
+        },
+        {
+          "date": "2026-06-17",
+          "open": 85.19,
+          "high": 85.39,
+          "low": 83.36,
+          "close": 83.68,
+          "previousClose": 85.59,
+          "dailyReturn": -0.02232
+        },
+        {
+          "date": "2026-06-18",
+          "open": 83.84,
+          "high": 83.89,
+          "low": 83.13,
+          "close": 83.3,
+          "previousClose": 83.68,
+          "dailyReturn": -0.00454
+        }
+      ]
+    },
+    "XHB": {
+      "open": 109.45,
+      "high": 112.28,
+      "low": 107.04,
+      "close": 111.04,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 109.45,
+          "high": 111.08,
+          "low": 108.25,
+          "close": 108.33,
+          "previousClose": 107.59,
+          "dailyReturn": 0.00688
+        },
+        {
+          "date": "2026-06-16",
+          "open": 109,
+          "high": 110.79,
+          "low": 108.94,
+          "close": 109.84,
+          "previousClose": 108.33,
+          "dailyReturn": 0.01394
+        },
+        {
+          "date": "2026-06-17",
+          "open": 109.59,
+          "high": 111.97,
+          "low": 107.04,
+          "close": 107.33,
+          "previousClose": 109.84,
+          "dailyReturn": -0.02285
+        },
+        {
+          "date": "2026-06-18",
+          "open": 109.17,
+          "high": 112.28,
+          "low": 109,
+          "close": 111.04,
+          "previousClose": 107.33,
+          "dailyReturn": 0.03457
+        }
+      ]
+    },
+    "EWY": {
+      "open": 207.86,
+      "high": 220.89,
+      "low": 204.49,
+      "close": 219.2,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 207.86,
+          "high": 211.67,
+          "low": 206.57,
+          "close": 211.45,
+          "previousClose": 197.45,
+          "dailyReturn": 0.0709
+        },
+        {
+          "date": "2026-06-16",
+          "open": 210.22,
+          "high": 213.78,
+          "low": 204.49,
+          "close": 205.91,
+          "previousClose": 211.45,
+          "dailyReturn": -0.0262
+        },
+        {
+          "date": "2026-06-17",
+          "open": 210.67,
+          "high": 213.28,
+          "low": 204.87,
+          "close": 205.08,
+          "previousClose": 205.91,
+          "dailyReturn": -0.00403
+        },
+        {
+          "date": "2026-06-18",
+          "open": 215,
+          "high": 220.89,
+          "low": 214.35,
+          "close": 219.2,
+          "previousClose": 205.08,
+          "dailyReturn": 0.06885
+        }
+      ]
+    },
+    "^KS11": {
+      "open": 8526.12,
+      "high": 9106.07,
+      "low": 8450.24,
+      "close": 9063.84,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 8526.12,
+          "high": 8603.48,
+          "low": 8450.24,
+          "close": 8545.98,
+          "previousClose": 8123.62,
+          "dailyReturn": 0.05199
+        },
+        {
+          "date": "2026-06-16",
+          "open": 8696.55,
+          "high": 8753.82,
+          "low": 8540.41,
+          "close": 8726.6,
+          "previousClose": 8545.98,
+          "dailyReturn": 0.02114
+        },
+        {
+          "date": "2026-06-17",
+          "open": 8622.13,
+          "high": 8872.18,
+          "low": 8605.66,
+          "close": 8864.24,
+          "previousClose": 8726.6,
+          "dailyReturn": 0.01577
+        },
+        {
+          "date": "2026-06-18",
+          "open": 8884.92,
+          "high": 9106.07,
+          "low": 8867.34,
+          "close": 9063.84,
+          "previousClose": 8864.24,
+          "dailyReturn": 0.02252
+        }
+      ]
+    },
+    "^N225": {
+      "open": 66783.22,
+      "high": 71398.58,
+      "low": 66783.22,
+      "close": 71053.49,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 66783.22,
+          "high": 69682.23,
+          "low": 66783.22,
+          "close": 69317.5,
+          "previousClose": 66020.04,
+          "dailyReturn": 0.04995
+        },
+        {
+          "date": "2026-06-16",
+          "open": 69288.91,
+          "high": 70020.68,
+          "low": 69095.67,
+          "close": 69404.5,
+          "previousClose": 69317.5,
+          "dailyReturn": 0.00126
+        },
+        {
+          "date": "2026-06-17",
+          "open": 69005.88,
+          "high": 70125.75,
+          "low": 68985.63,
+          "close": 69902.25,
+          "previousClose": 69404.5,
+          "dailyReturn": 0.00717
+        },
+        {
+          "date": "2026-06-18",
+          "open": 70163.71,
+          "high": 71398.58,
+          "low": 70092.94,
+          "close": 71053.49,
+          "previousClose": 69902.25,
+          "dailyReturn": 0.01647
+        }
+      ]
+    },
+    "SMH": {
+      "open": 643.5,
+      "high": 663.8,
+      "low": 616,
+      "close": 659.88,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 643.5,
+          "high": 649.24,
+          "low": 639.25,
+          "close": 647.1,
+          "previousClose": 619.96,
+          "dailyReturn": 0.04378
+        },
+        {
+          "date": "2026-06-16",
+          "open": 643.52,
+          "high": 648.31,
+          "low": 616,
+          "close": 616,
+          "previousClose": 647.1,
+          "dailyReturn": -0.04806
+        },
+        {
+          "date": "2026-06-17",
+          "open": 633.46,
+          "high": 643.5,
+          "low": 623.13,
+          "close": 623.97,
+          "previousClose": 616,
+          "dailyReturn": 0.01294
+        },
+        {
+          "date": "2026-06-18",
+          "open": 648.54,
+          "high": 663.8,
+          "low": 648.15,
+          "close": 659.88,
+          "previousClose": 623.97,
+          "dailyReturn": 0.05755
+        }
+      ]
+    },
+    "XOP": {
+      "open": 157.52,
+      "high": 160.43,
+      "low": 151.55,
+      "close": 153.36,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 157.52,
+          "high": 160.43,
+          "low": 157.52,
+          "close": 158.36,
+          "previousClose": 165.34,
+          "dailyReturn": -0.04222
+        },
+        {
+          "date": "2026-06-16",
+          "open": 156.19,
+          "high": 157.96,
+          "low": 155.76,
+          "close": 157.17,
+          "previousClose": 158.36,
+          "dailyReturn": -0.00751
+        },
+        {
+          "date": "2026-06-17",
+          "open": 156.45,
+          "high": 158.04,
+          "low": 155.08,
+          "close": 155.75,
+          "previousClose": 157.17,
+          "dailyReturn": -0.00903
+        },
+        {
+          "date": "2026-06-18",
+          "open": 154.23,
+          "high": 154.41,
+          "low": 151.55,
+          "close": 153.36,
+          "previousClose": 155.75,
+          "dailyReturn": -0.01535
+        }
+      ]
+    },
+    "IYT": {
+      "open": 87.52,
+      "high": 87.88,
+      "low": 83.13,
+      "close": 83.94,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 87.52,
+          "high": 87.88,
+          "low": 86.25,
+          "close": 86.51,
+          "previousClose": 86.51,
+          "dailyReturn": 0
+        },
+        {
+          "date": "2026-06-16",
+          "open": 86.76,
+          "high": 87.31,
+          "low": 85.99,
+          "close": 86.1,
+          "previousClose": 86.51,
+          "dailyReturn": -0.00474
+        },
+        {
+          "date": "2026-06-17",
+          "open": 85.94,
+          "high": 86.04,
+          "low": 83.13,
+          "close": 83.32,
+          "previousClose": 86.1,
+          "dailyReturn": -0.03229
+        },
+        {
+          "date": "2026-06-18",
+          "open": 84,
+          "high": 84.88,
+          "low": 83.74,
+          "close": 83.94,
+          "previousClose": 83.32,
+          "dailyReturn": 0.00744
+        }
+      ]
+    },
+    "IWM": {
+      "open": 296.56,
+      "high": 297.91,
+      "low": 288.93,
+      "close": 295.59,
+      "bars": [
+        {
+          "date": "2026-06-15",
+          "open": 296.56,
+          "high": 297.91,
+          "low": 293.92,
+          "close": 294.64,
+          "previousClose": 292.95,
+          "dailyReturn": 0.00577
+        },
+        {
+          "date": "2026-06-16",
+          "open": 295.5,
+          "high": 296.8,
+          "low": 291.58,
+          "close": 292.08,
+          "previousClose": 294.64,
+          "dailyReturn": -0.00869
+        },
+        {
+          "date": "2026-06-17",
+          "open": 292.47,
+          "high": 295.82,
+          "low": 288.93,
+          "close": 289.88,
+          "previousClose": 292.08,
+          "dailyReturn": -0.00753
+        },
+        {
+          "date": "2026-06-18",
+          "open": 294.55,
+          "high": 295.97,
+          "low": 291.42,
+          "close": 295.59,
+          "previousClose": 289.88,
+          "dailyReturn": 0.0197
+        }
+      ]
+    }
+  }
+}

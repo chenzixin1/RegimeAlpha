@@ -201,8 +201,9 @@ const CHAT_SUGGESTIONS = [
   "现在哪些指标最可能提示 regime 切换？"
 ];
 
-export default function RegimeDashboard({ initialData }) {
+export default function RegimeDashboard({ initialData, previewConfig = null, initialPreviewCandles = null }) {
   const [data, setData] = useState(initialData);
+  const [previewCandles, setPreviewCandles] = useState(initialPreviewCandles);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
   const [selectedAssetSymbol, setSelectedAssetSymbol] = useState("SOXX");
   const [heatmapKey, setHeatmapKey] = useState("MARKET");
@@ -222,10 +223,14 @@ export default function RegimeDashboard({ initialData }) {
   const [chatError, setChatError] = useState(null);
 
   useEffect(() => {
+    if (previewConfig?.disableDataRefresh) return undefined;
+
     let cancelled = false;
     async function loadWorkerData() {
       try {
-        const response = await fetch(`/data/regimes.json?ts=${Date.now()}`, { cache: "no-store" });
+        const dataUrl = previewConfig?.refreshDataUrl || "/data/regimes.json";
+        const separator = dataUrl.includes("?") ? "&" : "?";
+        const response = await fetch(`${dataUrl}${separator}ts=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) return;
         const nextData = await response.json();
         if (!cancelled && nextData?.summary?.latest?.weekEnd) {
@@ -239,7 +244,31 @@ export default function RegimeDashboard({ initialData }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [previewConfig?.disableDataRefresh, previewConfig?.refreshDataUrl]);
+
+  useEffect(() => {
+    if (!previewConfig?.candleDataUrl) return undefined;
+
+    let cancelled = false;
+    async function loadPreviewCandles() {
+      try {
+        const separator = previewConfig.candleDataUrl.includes("?") ? "&" : "?";
+        const response = await fetch(`${previewConfig.candleDataUrl}${separator}ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const nextData = await response.json();
+        if (!cancelled && nextData?.weekEnd && nextData?.candles) {
+          setPreviewCandles(nextData);
+        }
+      } catch {
+        // Keep preview card layout even if the local candle API is unavailable.
+      }
+    }
+
+    loadPreviewCandles();
+    return () => {
+      cancelled = true;
+    };
+  }, [previewConfig?.candleDataUrl]);
 
   const rows = data.regimes;
   const assetRegimes = data.assetRegimes || [];
@@ -303,6 +332,12 @@ export default function RegimeDashboard({ initialData }) {
       setSelectedWeek(latest.weekEnd);
     }
   }, [latest.weekEnd, rows, selectedWeek]);
+
+  useEffect(() => {
+    if (previewConfig?.syncSelectedWeekToLatest && selectedWeek !== latest.weekEnd) {
+      setSelectedWeek(latest.weekEnd);
+    }
+  }, [latest.weekEnd, previewConfig?.syncSelectedWeekToLatest, selectedWeek]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -381,6 +416,7 @@ export default function RegimeDashboard({ initialData }) {
         <div>
           <p className="kicker">RegimeAlpha / US Equities</p>
           <h1>美股周度 Regime 地图</h1>
+          {previewConfig?.label ? <span className="preview-badge">{previewConfig.label}</span> : null}
         </div>
         <div className="freshness">
           <span>数据截至</span>
@@ -546,29 +582,40 @@ export default function RegimeDashboard({ initialData }) {
           ) : null}
         </section>
 
-        <section className="asset-panel">
+        <section className="asset-panel" id="asset-regime-panel">
           <PanelTitle title="行业 / 产业 Regime" meta={`${selected.weekEnd} · ${assetRowsForWeek.length} proxies`} />
-          <div className="asset-grid">
+          <div className={`asset-grid ${previewConfig?.showAssetWeekCandle ? "asset-grid-preview" : ""}`}>
             {assetRowsForWeek.map((row) => (
               <button
                 key={row.symbol}
-                className={`asset-tile ${selectedAssetRow?.symbol === row.symbol ? "selected" : ""}`}
+                className={`asset-tile ${previewConfig?.showAssetWeekCandle ? "asset-tile-preview" : ""} ${selectedAssetRow?.symbol === row.symbol ? "selected" : ""}`}
                 style={{ "--accent": COLORS[row.code] }}
                 onClick={() => setSelectedAssetSymbol(row.symbol)}
-                title={`${row.displaySymbol} ${row.name} · ${row.labelZh}`}
+                title={previewConfig?.showAssetWeekCandle ? undefined : `${row.displaySymbol} ${row.name} · ${row.labelZh}`}
               >
-                <span className="asset-topline">
-                  <strong>{row.displaySymbol}</strong>
-                  <em>{row.group}</em>
-                </span>
-                <span className="asset-name">{row.name}</span>
-                <span className="asset-bottomline">
-                  <span className="asset-regime">
-                    <RegimeLogo code={row.code} size={18} />
-                    {row.labelZh}
-                  </span>
-                  <b className={tone(row.metrics.ret13w)}>{formatPercent(row.metrics.ret13w)}</b>
-                </span>
+                {previewConfig?.showAssetWeekCandle ? (
+                  <AssetPreviewTileContent
+                    row={row}
+                    candle={previewCandles?.weekEnd === row.weekEnd ? previewCandles.candles?.[row.symbol] : null}
+                    definition={definitions[row.code]}
+                    strategies={data.strategyMap?.[row.code]}
+                  />
+                ) : (
+                  <>
+                    <span className="asset-topline">
+                      <strong>{row.displaySymbol}</strong>
+                      <em>{row.group}</em>
+                    </span>
+                    <span className="asset-name">{row.name}</span>
+                    <span className="asset-bottomline">
+                      <span className="asset-regime">
+                        <RegimeLogo code={row.code} size={18} />
+                        {row.labelZh}
+                      </span>
+                      <b className={tone(row.metrics.ret13w)}>{formatPercent(row.metrics.ret13w)}</b>
+                    </span>
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -778,6 +825,158 @@ export default function RegimeDashboard({ initialData }) {
         </section>
       ) : null}
     </div>
+  );
+}
+
+function AssetPreviewTileContent({ row, candle, definition, strategies }) {
+  const explainer = REGIME_EXPLAINERS[row.code] || {};
+  const tooltipId = `asset-regime-tip-${row.symbol}`;
+
+  return (
+    <span className="asset-preview-layout">
+      <span className="asset-preview-identity">
+        <span className="asset-preview-heading">
+          <strong>{row.displaySymbol}</strong>
+          <span className="asset-preview-regime" aria-describedby={tooltipId}>
+            <span className="asset-preview-regime-text">{row.labelZh}</span>
+            <span className="asset-regime-tooltip" id={tooltipId} role="tooltip">
+              <strong>{definition?.labelZh || row.labelZh}</strong>
+              <em>{definition?.label || row.label}</em>
+              <span>{explainer.signal || definition?.thesis || row.thesis}</span>
+              <span>观察：{explainer.metrics || row.drivers?.slice(0, 2).join(" / ") || "-"}</span>
+              <b>适合：{strategies?.best?.slice(0, 2).join(" / ") || "查看 Regime 说明表"}</b>
+            </span>
+          </span>
+        </span>
+        <span className="asset-preview-name">{row.name}</span>
+        <em>{row.group}</em>
+      </span>
+
+      <span className="asset-preview-chart">
+        <MiniCandlestickStrip candle={candle} variant="wide" />
+        <span className="asset-candle-meta">本周日 K</span>
+      </span>
+
+      <span className="asset-preview-metrics">
+        <span>
+          <i>振幅</i>
+          <b>{formatPercent(row.metrics.weekRange)}</b>
+        </span>
+        <span>
+          <i>周涨跌</i>
+          <b className={tone(row.metrics.weeklyReturn)}>{formatSignedPercent(row.metrics.weeklyReturn)}</b>
+        </span>
+        <span>
+          <i>13W</i>
+          <b className={tone(row.metrics.ret13w)}>{formatSignedPercent(row.metrics.ret13w)}</b>
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function MiniCandlestickStrip({ candle, variant = "compact" }) {
+  const bars = candle?.bars || [];
+  const [activeIndex, setActiveIndex] = useState(null);
+  if (!bars.length) {
+    return <span className={`mini-candle ${variant} loading`}>加载中</span>;
+  }
+
+  const isWide = variant === "wide";
+  const viewWidth = isWide ? 236 : 46;
+  const viewHeight = isWide ? 84 : 40;
+  const chartLeft = isWide ? 30 : 5;
+  const chartRight = isWide ? 8 : 5;
+  const chartTop = isWide ? 8 : 6;
+  const chartBottom = isWide ? 23 : 6;
+  const chartBottomY = viewHeight - chartBottom;
+  const high = Math.max(...bars.map((bar) => bar.high));
+  const low = Math.min(...bars.map((bar) => bar.low));
+  const yTicks = isWide ? priceTicks(low, high) : [];
+  const domainLow = yTicks[0] ?? low;
+  const domainHigh = yTicks.at(-1) ?? high;
+  const range = domainHigh - domainLow || 1;
+  const scaleY = (value) => chartBottomY - ((value - low) / range) * (chartBottomY - chartTop);
+  const step = (viewWidth - chartLeft - chartRight) / Math.max(bars.length, 1);
+  const scaleDomainY = (value) => chartBottomY - ((value - domainLow) / range) * (chartBottomY - chartTop);
+  const yScale = isWide ? scaleDomainY : scaleY;
+  const bodyWidth = Math.min(isWide ? 18 : 7, Math.max(isWide ? 10 : 4, step * 0.42));
+  const activeBar = Number.isInteger(activeIndex) ? bars[activeIndex] : null;
+  const activeReturn = activeBar ? dailyReturn(activeBar, bars[activeIndex - 1]) : null;
+  const activeX = activeBar ? chartLeft + step * activeIndex + step / 2 : viewWidth / 2;
+
+  return (
+    <span
+      className={`mini-candle ${variant} strip`}
+      aria-label={bars.map((bar, index) => `${bar.date} 涨跌 ${formatSignedPercent(dailyReturn(bar, bars[index - 1]))}, O ${bar.open}, H ${bar.high}, L ${bar.low}, C ${bar.close}`).join("; ")}
+      onPointerLeave={() => setActiveIndex(null)}
+      onMouseLeave={() => setActiveIndex(null)}
+    >
+      <svg viewBox={`0 0 ${viewWidth} ${viewHeight}`} role="img" aria-hidden="true">
+        {isWide ? (
+          <>
+            {yTicks.map((tick, index) => {
+              const y = scaleDomainY(tick);
+              return (
+                <g key={tick}>
+                  <text className="mini-candle-axis-label" x="6" y={y + 4}>
+                    {formatAxisPrice(tick)}
+                  </text>
+                  <line
+                    className={index === 0 ? "mini-candle-axis-line" : "mini-candle-guide"}
+                    x1={chartLeft}
+                    x2={viewWidth - chartRight}
+                    y1={y}
+                    y2={y}
+                  />
+                </g>
+              );
+            })}
+          </>
+        ) : null}
+        {bars.map((bar, index) => {
+          const x = chartLeft + step * index + step / 2;
+          const wickTop = yScale(bar.high);
+          const wickBottom = yScale(bar.low);
+          const bodyTop = yScale(Math.max(bar.open, bar.close));
+          const bodyBottom = yScale(Math.min(bar.open, bar.close));
+          const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+          const up = bar.close >= bar.open;
+          return (
+            <g key={bar.date} className={`${up ? "mini-candle-day up" : "mini-candle-day down"} ${activeIndex === index ? "active" : ""}`}>
+              <rect
+                className="mini-candle-hitbox"
+                x={x - step / 2}
+                y={chartTop - 5}
+                width={step}
+                height={chartBottomY - chartTop + 10}
+                rx="3"
+                onPointerEnter={() => setActiveIndex(index)}
+                onPointerMove={() => setActiveIndex(index)}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseMove={() => setActiveIndex(index)}
+              />
+              <line className="mini-candle-wick" x1={x} x2={x} y1={wickTop} y2={wickBottom} />
+              <rect className="mini-candle-body" x={x - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} rx={isWide ? "1" : "1.4"} />
+              {isWide ? (
+                <text className="mini-candle-date-label" x={x} y={viewHeight - 7}>
+                  {formatShortDate(bar.date)}
+                </text>
+              ) : null}
+            </g>
+          );
+        })}
+        {activeBar ? <line className="mini-candle-crosshair" x1={activeX} x2={activeX} y1={chartTop} y2={chartBottomY} /> : null}
+      </svg>
+      {activeBar ? (
+        <span className="mini-candle-tooltip" style={{ left: `${activeX}px` }} role="tooltip">
+          <span className="mini-candle-tooltip-date">{formatShortDate(activeBar.date)}</span>
+          <strong className={tone(activeReturn)}>日涨跌 {formatSignedPercent(activeReturn)}</strong>
+          <span>O {formatPrice(activeBar.open)} H {formatPrice(activeBar.high)}</span>
+          <span>L {formatPrice(activeBar.low)} C {formatPrice(activeBar.close)}</span>
+        </span>
+      ) : null}
+    </span>
   );
 }
 
@@ -1648,6 +1847,58 @@ function downloadCsv(rows, assetRegimes = []) {
 
 function formatPercent(value) {
   return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "-";
+}
+
+function formatSignedPercent(value) {
+  if (!Number.isFinite(value)) return "-";
+  const pct = value * 100;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function formatPrice(value) {
+  if (!Number.isFinite(value)) return "-";
+  return value >= 1000 ? value.toFixed(0) : value.toFixed(2);
+}
+
+function formatAxisPrice(value) {
+  if (!Number.isFinite(value)) return "-";
+  if (Math.abs(value) >= 100) return value.toFixed(0);
+  if (Math.abs(value) >= 10) return value.toFixed(1);
+  return value.toFixed(2);
+}
+
+function priceTicks(low, high) {
+  if (!Number.isFinite(low) || !Number.isFinite(high) || high <= low) return [];
+  const roughStep = (high - low) / 5;
+  const step = niceStep(roughStep);
+  const start = Math.floor(low / step) * step;
+  const end = Math.ceil(high / step) * step;
+  const ticks = [];
+  for (let value = start; value <= end + step / 2; value += step) {
+    ticks.push(Number(value.toFixed(6)));
+  }
+  return ticks.length > 7 ? ticks.filter((_, index) => index % 2 === 0) : ticks;
+}
+
+function niceStep(value) {
+  const exponent = Math.floor(Math.log10(value || 1));
+  const fraction = value / 10 ** exponent;
+  const niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+  return niceFraction * 10 ** exponent;
+}
+
+function formatShortDate(value) {
+  if (typeof value !== "string") return value || "-";
+  const [, month, day] = value.match(/^\d{4}-(\d{2})-(\d{2})$/) || [];
+  return month && day ? `${month}/${day}` : value;
+}
+
+function dailyReturn(bar, previousBar) {
+  if (Number.isFinite(bar?.dailyReturn)) return bar.dailyReturn;
+  if (Number.isFinite(bar?.previousClose) && bar.previousClose) return bar.close / bar.previousClose - 1;
+  if (Number.isFinite(previousBar?.close) && previousBar.close) return bar.close / previousBar.close - 1;
+  if (Number.isFinite(bar?.open) && bar.open) return bar.close / bar.open - 1;
+  return null;
 }
 
 function formatPressure(value) {
