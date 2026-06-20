@@ -247,7 +247,7 @@ async function main() {
 
   validateSeries(series);
 
-  const { rows, assetRegimes, assets } = buildWeeklyRegimes(series);
+  const { rows, assetRegimes, assets, assetWeekCandles } = buildWeeklyRegimes(series);
   const dataThrough = rows.at(-1)?.weekEnd || null;
   let payload = {
     metadata: {
@@ -294,10 +294,15 @@ async function main() {
   await mkdir("data", { recursive: true });
   await mkdir("public/data", { recursive: true });
   const json = `${JSON.stringify(payload, null, 2)}\n`;
+  const candleJson = `${JSON.stringify(assetWeekCandles, null, 2)}\n`;
   await writeFile("data/regimes.json", json);
   await writeFile("public/data/regimes.json", json);
+  await writeFile("public/local-preview-candles.json", candleJson);
   console.log(
     `Wrote data/regimes.json and public/data/regimes.json with ${payload.regimes.length} weekly regimes through ${payload.metadata.dataThrough}.`
+  );
+  console.log(
+    `Wrote public/local-preview-candles.json with ${Object.keys(assetWeekCandles.candles || {}).length} asset candle strips through ${assetWeekCandles.weekEnd}.`
   );
   if (INCREMENTAL) {
     console.log(
@@ -397,8 +402,52 @@ function buildWeeklyRegimes(series) {
       marketContext: market.context
     })
   }));
+  const assetWeekCandles = buildAssetWeekCandles(assets, enriched, market.rows.at(-1));
 
-  return { rows: market.rows, assetRegimes, assets };
+  return { rows: market.rows, assetRegimes, assets, assetWeekCandles };
+}
+
+function buildAssetWeekCandles(assets, enriched, latestWeek) {
+  const candles = {};
+  if (!latestWeek) {
+    return { weekEnd: null, candles };
+  }
+
+  for (const proxy of assets) {
+    const rows = enriched[proxy.symbol] || [];
+    const bars = rows
+      .filter((row) => row.date >= latestWeek.weekStart && row.date <= latestWeek.weekEnd)
+      .sort((a, b) => a.time - b.time);
+    if (!bars.length) continue;
+
+    const first = bars[0];
+    const last = bars.at(-1);
+    candles[proxy.symbol] = {
+      open: round(first.open, 2),
+      high: round(Math.max(...bars.map((bar) => bar.high)), 2),
+      low: round(Math.min(...bars.map((bar) => bar.low)), 2),
+      close: round(last.close, 2),
+      bars: bars.map((bar) => {
+        const index = findIndexByDate(rows, bar.date);
+        const previous = index > 0 ? rows[index - 1] : null;
+        return {
+          date: bar.date,
+          open: round(bar.open, 2),
+          high: round(bar.high, 2),
+          low: round(bar.low, 2),
+          close: round(bar.close, 2),
+          previousClose: round(previous?.close, 2),
+          dailyReturn: round(bar.dailyReturn, 5)
+        };
+      })
+    };
+  }
+
+  return {
+    weekStart: latestWeek.weekStart,
+    weekEnd: latestWeek.weekEnd,
+    candles
+  };
 }
 
 function mergeIncrementalPayload(previous, next) {
