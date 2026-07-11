@@ -54,9 +54,11 @@ WebSocket configuration is documented and validated, but persistent streaming is
 
 ## Symbol Compatibility
 
-US stocks and ETFs pass through unchanged, including every sector/industry proxy and `DRAM`. A single explicit mapping table covers all exceptions currently used by the repository: VIX to Massive's index namespace, `BTCUSD` to its crypto namespace, `^KS11` to KOSPI, `^N225` to Nikkei 225, and `000660.KS`/`005930.KS` to their Korean listing identifiers. Exact provider tickers must be confirmed by an unauthenticated metadata lookup or mocked contract before implementation is considered complete.
+US stocks and ETFs pass through unchanged, including every sector/industry proxy and `DRAM`. A single explicit mapping table covers all exceptions currently used by the repository: VIX to Massive's index namespace, `BTCUSD` to its crypto namespace, `^KS11` to KOSPI, `^N225` to Nikkei 225, and `000660.KS`/`005930.KS` to their Korean listing identifiers. Each exceptional mapping requires an authenticated, redacted live metadata or aggregate smoke check against the configured service and deployed plan. If that check is deliberately skipped or the plan lacks entitlement, the instrument is treated as unavailable rather than claimed as supported.
 
-Historical builds treat `SPY`, VIX, `TLT`, `QQQ`, and `IWM` as required primary series. Other asset proxies are optional only when the output records an explicit unavailable reason; the build may not silently reuse stale FMP data. If the Massive plan cannot supply KOSPI, Nikkei, or Korean listings, those instruments remain canonical entries marked unavailable rather than being substituted with unrelated assets.
+Historical builds treat `SPY`, VIX, `TLT`, `QQQ`, and `IWM` as required primary series. Each required series must contain at least 252 valid trading-day rows, begin no later than 14 calendar days after the requested fetch start, and end within seven calendar days of the requested end. Every retained row must have a valid timestamp, finite positive OHLC values, `high >= max(open, close)`, `low <= min(open, close)`, and non-negative volume. Violations fail with a ticker-specific coverage error before classification.
+
+Other asset proxies are optional only when the output records an explicit unavailable reason; the build may not silently reuse stale FMP data. A backward-compatible `metadata.unavailableSymbols` array records objects shaped as `{ symbol, providerSymbol, reason }`, while unavailable optional instruments are omitted from `assetRegimes` and `assetWeekCandles`. Existing consumers remain valid because all current fields retain their shape. Add a contract test with one unavailable optional proxy. If the Massive plan cannot supply KOSPI, Nikkei, or Korean listings, they use this representation rather than an unrelated substitute.
 
 ## Cache Migration
 
@@ -87,7 +89,7 @@ Add deterministic tests using mocked Massive responses for:
 
 Run `npm test` and `npm run build:static`. Search runtime, build, workflow, and documentation surfaces to ensure no active FMP endpoint or `FMP_API_KEY` references remain. Verify both `.github/workflows/daily-data-refresh.yml` and `.github/workflows/update-regime-kv.yml` use the Massive secret/config, and update README plus Cloudflare deployment instructions. A live smoke test may use the emailed proxy only from local secret configuration with the explicit insecure-transport opt-in; test output must not print the key. Generated files must contain neither credentials nor authenticated proxy query strings.
 
-The public JSON structure remains unchanged. Existing `metadata.source.endpoint` and `metadata.source.docs` values change to Massive equivalents, and FMP-specific proxy notes are rewritten as provider-neutral mapping notes. No metadata fields are added or removed, so consumers do not require a schema version bump.
+The public JSON structure receives one backward-compatible extension: optional `metadata.unavailableSymbols`. Existing `metadata.source.endpoint` and `metadata.source.docs` values change to Massive equivalents, and FMP-specific proxy notes are rewritten as provider-neutral mapping notes. No existing fields are removed or reshaped.
 
 ## Delivery
 
