@@ -45,7 +45,10 @@ jobs:
 
       - name: Build static site with refreshed data
         env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
           FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+          MASSIVE_BASE_URL: ${{ vars.MASSIVE_BASE_URL }}
+          MASSIVE_ALLOW_INSECURE_HTTP: ${{ vars.MASSIVE_ALLOW_INSECURE_HTTP }}
           REGIME_REFRESH: "1"
         run: npm run build
 

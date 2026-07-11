@@ -20,7 +20,10 @@ jobs:
     name: Refresh and publish regime data
     runs-on: ubuntu-latest
     env:
+      MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
       FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
+      MASSIVE_BASE_URL: ${{ vars.MASSIVE_BASE_URL }}
+      MASSIVE_ALLOW_INSECURE_HTTP: ${{ vars.MASSIVE_ALLOW_INSECURE_HTTP }}
       WORKER_UPDATE_TOKEN: ${{ secrets.WORKER_UPDATE_TOKEN }}
     steps:
       - name: Check out repository

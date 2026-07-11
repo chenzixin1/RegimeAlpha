@@ -1,3 +1,7 @@
+import { resolveMassiveConfig, redactMassiveSecret } from "../../lib/massive-config.js";
+import { fetchMassiveAggregates, toMassiveSymbol } from "../../lib/massive-client.js";
+import { fetchFmpQuotes, resolveFmpConfig } from "../../lib/fmp-client.js";
+
 const REFRESH_SECONDS = 60;
 const CORE_SYMBOLS = ["SPY", "QQQ", "IWM", "SOXX", "SMH", "IGV", "TLT", "BTCUSD"];
 const MEMORY_SYMBOLS = ["DRAM", "MU", "SNDK", "000660.KS", "005930.KS", "WDC", "STX"];
@@ -5,7 +9,6 @@ const OPTICAL_SYMBOLS = ["AAOI", "LITE", "COHR", "CIEN", "FN", "MTSI", "CRDO", "
 const QUOTE_SYMBOLS = [...new Set([...CORE_SYMBOLS, ...MEMORY_SYMBOLS, ...OPTICAL_SYMBOLS])];
 const CHART_SYMBOLS = ["SPY", "QQQ", "SOXX", "MU", "SNDK"];
 const VIX_SYMBOL = "^VIX";
-const FMP_BASE = "https://financialmodelingprep.com/stable";
 const SYMBOL_META = {
   DRAM: { displaySymbol: "DRAM", alias: "Roundhill Memory ETF", theme: "Memory ETF / 主题锚点", group: "ETF" },
   MU: { displaySymbol: "MU", alias: "美光 / Micron", theme: "DRAM / HBM", group: "Memory" },
@@ -38,10 +41,15 @@ export async function onRequestGet({ env, request }) {
     return json(memoryCache.payload, 200, "HIT");
   }
 
-  if (!env.FMP_API_KEY) {
+  let config;
+  let fmpConfig;
+  try {
+    config = resolveMassiveConfig(env);
+    fmpConfig = resolveFmpConfig(env);
+  } catch (error) {
     return json(
       {
-        error: "FMP_API_KEY is not configured for the Pages Function.",
+        error: error.message,
         generatedAt: new Date().toISOString(),
         refreshSeconds: REFRESH_SECONDS
       },
@@ -51,7 +59,7 @@ export async function onRequestGet({ env, request }) {
   }
 
   try {
-    const payload = await buildPulse(env.FMP_API_KEY);
+    const payload = await buildPulse(config, fmpConfig);
     memoryCache = {
       payload,
       expiresAt: now + REFRESH_SECONDS * 1000
@@ -81,19 +89,22 @@ export async function onRequestGet({ env, request }) {
   }
 }
 
-async function buildPulse(apiKey) {
-  const [quoteRows, vixRows, chartEntries] = await Promise.all([
-    fetchJson(`${FMP_BASE}/batch-quote?symbols=${QUOTE_SYMBOLS.join(",")}&apikey=${apiKey}`),
-    fetchJson(`${FMP_BASE}/quote?symbol=${encodeURIComponent(VIX_SYMBOL)}&apikey=${apiKey}`),
+async function buildPulse(config, fmpConfig) {
+  const now = new Date();
+  const from = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const to = now.toISOString().slice(0, 10);
+  const [snapshot, fmpQuotes, chartEntries] = await Promise.all([
+    fetchMassiveSnapshot(config, QUOTE_SYMBOLS.filter((symbol) => !symbol.startsWith("^") && !symbol.includes(".") && symbol !== "BTCUSD")),
+    fetchFmpQuotes(fmpConfig, [VIX_SYMBOL, "BTCUSD", "000660.KS", "005930.KS"]),
     Promise.all(
       CHART_SYMBOLS.map(async (symbol) => [
         symbol,
-        await fetchJson(`${FMP_BASE}/historical-chart/5min?symbol=${symbol}&apikey=${apiKey}`)
+        normalizeMassiveChartBars((await fetchMassiveAggregates(config, { symbol, from, to, multiplier: 5, timespan: "minute", limit: 5000 })).results)
       ])
     )
   ]);
 
-  const rawQuotes = [...asArray(quoteRows), ...asArray(vixRows)];
+  const rawQuotes = [...snapshot.map(normalizeMassiveSnapshot), ...fmpQuotes];
   const spy = rawQuotes.find((quote) => quote.symbol === "SPY");
   const spyChange = normalizePercent(spy?.changePercentage);
   const quotes = rawQuotes
@@ -132,19 +143,48 @@ async function buildPulse(apiKey) {
   };
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url, {
-    cf: { cacheTtl: 30, cacheEverything: false }
-  });
+async function fetchMassiveSnapshot(config, symbols) {
+  const url = new URL("/v2/snapshot/locale/us/markets/stocks/tickers", config.baseUrl);
+  url.searchParams.set("tickers", symbols.map(toMassiveSymbol).join(","));
+  url.searchParams.set("apiKey", config.apiKey);
+  const response = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: false } });
   const text = await response.text();
   if (!response.ok) {
-    throw new Error(`FMP request failed: ${response.status} ${text.slice(0, 120)}`);
+    throw new Error(redactMassiveSecret(`Massive snapshot failed: ${response.status} ${text.slice(0, 120)}`, config.apiKey));
   }
   try {
-    return JSON.parse(text);
+    const payload = JSON.parse(text);
+    return asArray(payload.tickers);
   } catch {
-    throw new Error(`FMP returned non-JSON: ${text.slice(0, 120)}`);
+    throw new Error(redactMassiveSecret(`Massive returned non-JSON: ${text.slice(0, 120)}`, config.apiKey));
   }
+}
+
+function normalizeMassiveSnapshot(row) {
+  return {
+    symbol: row.ticker,
+    name: row.ticker,
+    price: row.lastTrade?.p ?? row.day?.c,
+    change: row.todaysChange,
+    changePercentage: row.todaysChangePerc,
+    volume: row.day?.v,
+    dayLow: row.day?.l,
+    dayHigh: row.day?.h,
+    previousClose: row.prevDay?.c,
+    timestamp: row.updated,
+    exchange: row.lastTrade?.x ? String(row.lastTrade.x) : null
+  };
+}
+
+function normalizeMassiveChartBars(rows) {
+  return asArray(rows).map((row) => ({
+    date: new Date(Number(row.t)).toISOString().replace("T", " ").slice(0, 19),
+    open: Number(row.o),
+    high: Number(row.h),
+    low: Number(row.l),
+    close: Number(row.c),
+    volume: Number(row.v || 0)
+  }));
 }
 
 function normalizeQuote(quote, spyChange) {
