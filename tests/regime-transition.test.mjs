@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("latest high-volume down week exposes elevated transition risk", async () => {
+test("known high-volume down week exposes elevated transition risk", async () => {
   const payload = JSON.parse(await readFile(new URL("../data/regimes.json", import.meta.url), "utf8"));
-  const latest = payload.regimes.at(-1);
+  const latest = payload.regimes.find((row) => row.weekEnd === "2026-06-05");
 
-  assert.equal(latest.weekEnd, "2026-06-05");
+  assert.ok(latest, "fixture should include the 2026-06-05 stress week");
   assert.ok(latest.metrics.weeklyReturn <= -0.02);
   assert.ok(latest.metrics.downVolumeZ20 >= 2);
   assert.equal(latest.metrics.distributionDay, true);

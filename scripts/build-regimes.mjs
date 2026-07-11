@@ -2,10 +2,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname } from "node:path";
+import { resolveMassiveConfig } from "../lib/massive-config.js";
+import { fetchMassiveAggregates, normalizeMassiveBars, toMassiveSymbol } from "../lib/massive-client.js";
+import { fetchFmpDaily, resolveFmpConfig } from "../lib/fmp-client.js";
 
 loadLocalEnv([".env.local", ".env"]);
 
-const API_KEY = process.env.FMP_API_KEY;
+const MASSIVE_CONFIG = resolveMassiveConfig(process.env);
+const FMP_CONFIG = resolveFmpConfig(process.env);
+const FMP_PRIMARY_SYMBOLS = new Set(["^VIX", "^KS11", "^N225"]);
 const AS_OF = process.env.AS_OF_DATE || new Date().toISOString().slice(0, 10);
 const REFRESH = process.env.REGIME_REFRESH === "1";
 const INCREMENTAL = process.env.REGIME_INCREMENTAL === "1";
@@ -259,16 +264,16 @@ async function main() {
       primaryProxy: "SPY",
       model: "rules-v1.2-transition-proxy",
       source: {
-        vendor: "Financial Modeling Prep",
-        endpoint: "https://financialmodelingprep.com/stable/historical-price-eod/full",
-        docs: "https://site.financialmodelingprep.com/developer/docs/stable/historical-price-eod-full"
+        vendor: "Massive + Financial Modeling Prep",
+        endpoint: "Massive aggregates with FMP index/international fallback",
+        docs: "https://massive.com/docs/rest/stocks/aggregates/custom-bars"
       },
       methodology: [
         "SPY daily bars are aggregated to calendar weeks using the last trading day as weekEnd.",
         "Market-level regime labels use the paper's taxonomy: return drift, realized volatility, correlation, VIX, equity-bond correlation, serial autocorrelation, and microstructure shock proxies.",
         "A TVTP-style transition proxy estimates off-diagonal switch pressure from weekly selloffs, high-volume down days, VIX stress, trend-efficiency collapse, and moving-average breaks.",
         "Sector and industry proxies are classified separately using each proxy's own trend, volatility, drawdown, serial autocorrelation, market-relative return, and correlation-to-SPY metrics.",
-        "SOX is represented by SOXX because the FMP EOD endpoint returned no ^SOX historical bars in this environment.",
+        "SOX is represented by SOXX as a liquid semiconductor proxy.",
         "Sector ETF pairwise rolling correlations approximate cross-asset correlation dynamics.",
         "TLT vs SPY rolling correlation and joint drawdowns flag stagflationary weeks.",
         "Labels are descriptive research annotations, not investment advice."
@@ -317,59 +322,46 @@ async function main() {
 }
 
 async function fetchDaily(symbol) {
-  const cacheKey = `${symbol}|${formatDate(FETCH_START)}|${AS_OF}|historical-price-eod-full`;
-  const cached = readFmpCache(cacheKey);
+  if (FMP_PRIMARY_SYMBOLS.has(symbol)) {
+    return fetchDailyFromFmp(symbol, "primary");
+  }
+  try {
+    const rows = await fetchDailyFromMassive(symbol);
+    if (rows.length) return rows;
+  } catch (error) {
+    console.warn(`Massive ${symbol} unavailable; using FMP fallback (${error.message.split("\n")[0]}).`);
+  }
+  return fetchDailyFromFmp(symbol, "fallback");
+}
+
+async function fetchDailyFromMassive(symbol) {
+  const providerSymbol = toMassiveSymbol(symbol);
+  const cacheKey = `massive|v1|${MASSIVE_CONFIG.baseUrl.origin}|${symbol}|${providerSymbol}|${formatDate(FETCH_START)}|${AS_OF}|aggs-1-day`;
+  const cached = readProviderCache(cacheKey);
   if (cached) {
     return cached;
   }
-  if (!API_KEY) {
-    throw new Error(`Missing FMP_API_KEY and no SQLite cache entry for ${symbol}.`);
-  }
+  const response = await fetchMassiveAggregates(MASSIVE_CONFIG, {
+    symbol,
+    from: formatDate(FETCH_START),
+    to: AS_OF
+  });
+  const rows = normalizeMassiveBars(symbol, response.results);
+  writeProviderCache(cacheKey, symbol, providerSymbol, rows);
+  return rows;
+}
 
-  const url = new URL("https://financialmodelingprep.com/stable/historical-price-eod/full");
-  url.searchParams.set("symbol", symbol);
-  url.searchParams.set("from", formatDate(FETCH_START));
-  url.searchParams.set("to", AS_OF);
-  url.searchParams.set("apikey", API_KEY);
-
-  const response = await fetch(url);
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`FMP ${symbol} failed: ${response.status} ${text.slice(0, 200)}`);
-  }
-
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error(`FMP ${symbol} returned non-JSON: ${text.slice(0, 200)}`);
-  }
-
-  if (!Array.isArray(data)) {
-    throw new Error(`FMP ${symbol} returned ${JSON.stringify(data).slice(0, 240)}`);
-  }
-
-  const rows = data
-    .filter((bar) => bar.date && Number.isFinite(Number(bar.close)))
-    .map((bar) => ({
-      symbol,
-      date: bar.date,
-      time: parseDate(bar.date).getTime(),
-      open: Number(bar.open),
-      high: Number(bar.high),
-      low: Number(bar.low),
-      close: Number(bar.close),
-      volume: Number(bar.volume || 0),
-      changePercent: Number(bar.changePercent || 0)
-    }))
-    .sort((a, b) => a.time - b.time);
-
-  writeFmpCache(cacheKey, symbol, rows);
+async function fetchDailyFromFmp(symbol, role) {
+  const cacheKey = `fmp|v1|${symbol}|${formatDate(FETCH_START)}|${AS_OF}|historical-price-eod-full`;
+  const cached = readProviderCache(cacheKey);
+  if (cached) return cached;
+  const rows = await fetchFmpDaily(FMP_CONFIG, { symbol, from: formatDate(FETCH_START), to: AS_OF });
+  writeProviderCache(cacheKey, symbol, symbol, rows, `fmp-${role}`);
   return rows;
 }
 
 function validateSeries(series) {
-  for (const symbol of ["SPY", "^VIX", "TLT"]) {
+  for (const symbol of ["SPY", "^VIX", "TLT", "QQQ", "IWM"]) {
     if (!series[symbol] || series[symbol].length < 260) {
       throw new Error(`${symbol} history is too short or unavailable.`);
     }
@@ -1347,9 +1339,11 @@ function initCache() {
   mkdirSync(dirname(SQLITE_PATH), { recursive: true });
   sqliteExec(`
     PRAGMA journal_mode = WAL;
-    CREATE TABLE IF NOT EXISTS fmp_cache (
+    CREATE TABLE IF NOT EXISTS provider_cache (
       cache_key TEXT PRIMARY KEY,
+      provider TEXT NOT NULL,
       symbol TEXT NOT NULL,
+      provider_symbol TEXT NOT NULL,
       from_date TEXT NOT NULL,
       to_date TEXT NOT NULL,
       response_json TEXT NOT NULL,
@@ -1391,9 +1385,9 @@ function initCache() {
 	  `);
 }
 
-function readFmpCache(cacheKey) {
+function readProviderCache(cacheKey) {
   if (!SQLITE_ENABLED || REFRESH) return null;
-  const rows = sqliteJson(`SELECT response_json FROM fmp_cache WHERE cache_key = ${sqlString(cacheKey)} LIMIT 1;`);
+  const rows = sqliteJson(`SELECT response_json FROM provider_cache WHERE cache_key = ${sqlString(cacheKey)} LIMIT 1;`);
   if (!rows.length) return null;
   try {
     return JSON.parse(rows[0].response_json);
@@ -1402,13 +1396,15 @@ function readFmpCache(cacheKey) {
   }
 }
 
-function writeFmpCache(cacheKey, symbol, rows) {
+function writeProviderCache(cacheKey, symbol, providerSymbol, rows, provider = "massive") {
   if (!SQLITE_ENABLED) return;
   sqliteExec(`
-    INSERT INTO fmp_cache (cache_key, symbol, from_date, to_date, response_json, fetched_at)
+    INSERT INTO provider_cache (cache_key, provider, symbol, provider_symbol, from_date, to_date, response_json, fetched_at)
     VALUES (
       ${sqlString(cacheKey)},
+      ${sqlString(provider)},
       ${sqlString(symbol)},
+      ${sqlString(providerSymbol)},
       ${sqlString(formatDate(FETCH_START))},
       ${sqlString(AS_OF)},
       ${sqlString(JSON.stringify(rows))},
