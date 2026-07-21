@@ -216,14 +216,22 @@ const INDUSTRY_VARIANTS = {
     label: "C",
     title: "Regime 强弱地图",
     description: "用 Rel SPY 与 Switch Risk 定位板块分化。"
+  },
+  merged: {
+    label: "M",
+    title: "Regime 研究工作台",
+    description: "卡片扫描、可排序表格与强弱地图在同一上下文联动。"
   }
 };
 
 const ASSET_SORT_OPTIONS = [
+  { key: "symbol", label: "标的代码", defaultDirection: "asc" },
+  { key: "regime", label: "Regime", defaultDirection: "asc" },
   { key: "ret13w", label: "13W 收益", defaultDirection: "desc" },
   { key: "relativeToSpy13w", label: "Rel SPY", defaultDirection: "desc" },
   { key: "weeklyReturn", label: "1W 收益", defaultDirection: "desc" },
-  { key: "switchRisk", label: "Switch Risk", defaultDirection: "asc" },
+  { key: "ret4w", label: "4W 收益", defaultDirection: "desc" },
+  { key: "switchRisk", label: "Switch Risk", defaultDirection: "desc" },
   { key: "confidence", label: "Confidence", defaultDirection: "desc" },
   { key: "realizedVol20", label: "20D Vol", defaultDirection: "asc" },
   { key: "drawdown52w", label: "52W Drawdown", defaultDirection: "desc" }
@@ -334,16 +342,16 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
     () => [...new Set(assetRowsForWeek.map((row) => row.code))],
     [assetRowsForWeek]
   );
+  const filteredAssetRows = useMemo(
+    () => assetRowsForWeek
+      .filter((row) => assetGroup === "all" || row.group === assetGroup)
+      .filter((row) => assetRegimeCode === "all" || row.code === assetRegimeCode),
+    [assetGroup, assetRegimeCode, assetRowsForWeek]
+  );
   const rankedAssetRows = useMemo(() => {
     const direction = assetSortDirection === "asc" ? 1 : -1;
-    return assetRowsForWeek
-      .filter((row) => assetGroup === "all" || row.group === assetGroup)
-      .filter((row) => assetRegimeCode === "all" || row.code === assetRegimeCode)
-      .sort((left, right) => {
-        const delta = assetSortValue(left, assetSortKey) - assetSortValue(right, assetSortKey);
-        return delta === 0 ? left.displaySymbol.localeCompare(right.displaySymbol) : delta * direction;
-      });
-  }, [assetGroup, assetRegimeCode, assetRowsForWeek, assetSortDirection, assetSortKey]);
+    return [...filteredAssetRows].sort((left, right) => compareAssetRows(left, right, assetSortKey) * direction);
+  }, [assetSortDirection, assetSortKey, filteredAssetRows]);
   const marketAsset = assetRegimes.find((asset) => asset.symbol === "SPY") || assetRegimes[0];
   const byAssetWeek = useMemo(() => {
     const map = new Map();
@@ -427,6 +435,18 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
   };
   const moveHeatmapTooltip = (row, event) => showHeatmapTooltip(row, event);
   const hideHeatmapTooltip = () => setHeatmapTooltip(null);
+  const selectAssetSort = (key) => {
+    const option = ASSET_SORT_OPTIONS.find((item) => item.key === key);
+    setAssetSortKey(key);
+    setAssetSortDirection(option?.defaultDirection || "desc");
+  };
+  const toggleAssetSort = (key) => {
+    if (key === assetSortKey) {
+      setAssetSortDirection((value) => (value === "desc" ? "asc" : "desc"));
+      return;
+    }
+    selectAssetSort(key);
+  };
   const askChat = async (preset) => {
     const content = (preset || chatInput).trim();
     if (!content || chatLoading) return;
@@ -651,11 +671,7 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
                 onDirectionChange={() => setAssetSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
                 onGroupChange={setAssetGroup}
                 onRegimeChange={setAssetRegimeCode}
-                onSortChange={(key) => {
-                  const option = ASSET_SORT_OPTIONS.find((item) => item.key === key);
-                  setAssetSortKey(key);
-                  setAssetSortDirection(option?.defaultDirection || "desc");
-                }}
+                onSortChange={selectAssetSort}
                 resultCount={rankedAssetRows.length}
                 variant={industryVariant}
               />
@@ -672,9 +688,12 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
               ) : null}
               {industryVariant === "b" ? (
                 <AssetResearchTable
+                  onSort={toggleAssetSort}
                   onSelect={setSelectedAssetSymbol}
                   rows={rankedAssetRows}
                   selectedSymbol={selectedAssetRow?.symbol}
+                  sortDirection={assetSortDirection}
+                  sortKey={assetSortKey}
                 />
               ) : null}
               {industryVariant === "c" ? (
@@ -682,6 +701,17 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
                   onSelect={setSelectedAssetSymbol}
                   rows={rankedAssetRows}
                   selectedSymbol={selectedAssetRow?.symbol}
+                />
+              ) : null}
+              {industryVariant === "merged" ? (
+                <UnifiedIndustryWorkspace
+                  filteredRows={filteredAssetRows}
+                  onSelect={setSelectedAssetSymbol}
+                  onSort={toggleAssetSort}
+                  rows={rankedAssetRows}
+                  selectedSymbol={selectedAssetRow?.symbol}
+                  sortDirection={assetSortDirection}
+                  sortKey={assetSortKey}
                 />
               ) : null}
               <AssetHistoryDrilldown
@@ -1047,19 +1077,118 @@ function AssetRankCardView({ definitions, onSelect, previewCandles, rows, select
   );
 }
 
-function AssetResearchTable({ onSelect, rows, selectedSymbol }) {
+function UnifiedIndustryWorkspace({ filteredRows, onSelect, onSort, rows, selectedSymbol, sortDirection, sortKey }) {
+  if (!filteredRows.length) return <AssetEmptyState />;
+  const activeSort = ASSET_SORT_OPTIONS.find((option) => option.key === sortKey)?.label || sortKey;
+  return (
+    <div className="unified-industry-workspace" data-testid="industry-view-merged">
+      <AssetSignalStrip onSelect={onSelect} rows={filteredRows} selectedSymbol={selectedSymbol} />
+      <div className="unified-industry-grid">
+        <section className="unified-table-pane">
+          <header className="unified-pane-head">
+            <div><span>Primary View / Research Ledger</span><h4>横向研究表格</h4></div>
+            <p>当前排序 <strong>{activeSort} {sortDirection === "desc" ? "↓" : "↑"}</strong></p>
+          </header>
+          <AssetResearchTable
+            onSelect={onSelect}
+            onSort={onSort}
+            rows={rows}
+            selectedSymbol={selectedSymbol}
+            sortDirection={sortDirection}
+            sortKey={sortKey}
+          />
+        </section>
+        <aside className="unified-map-pane">
+          <header className="unified-pane-head">
+            <div><span>Structure View / Regime Field</span><h4>板块强弱地图</h4></div>
+            <p>颜色 = Regime<br />大小 = Confidence</p>
+          </header>
+          <AssetRegimeMap compact onSelect={onSelect} rows={filteredRows} selectedSymbol={selectedSymbol} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function AssetSignalStrip({ onSelect, rows, selectedSymbol }) {
+  const signalGroups = [
+    {
+      key: "leaders",
+      eyebrow: "A / 快速扫描",
+      title: "Rel SPY 领先",
+      metric: "relativeToSpy13w",
+      rows: [...rows].sort((left, right) => right.metrics.relativeToSpy13w - left.metrics.relativeToSpy13w).slice(0, 3)
+    },
+    {
+      key: "laggards",
+      eyebrow: "A / 快速扫描",
+      title: "13W 落后",
+      metric: "ret13w",
+      rows: [...rows].sort((left, right) => left.metrics.ret13w - right.metrics.ret13w).slice(0, 3)
+    },
+    {
+      key: "risk",
+      eyebrow: "A / 快速扫描",
+      title: "高切换风险",
+      metric: "switchRisk",
+      rows: [...rows].sort((left, right) => numberValue(right.transition?.pressure) - numberValue(left.transition?.pressure)).slice(0, 3)
+    }
+  ];
+  return (
+    <div className="asset-signal-strip" data-testid="merged-signal-strip">
+      {signalGroups.map((group) => (
+        <section key={group.key} className={`asset-signal-group ${group.key}`}>
+          <header><span>{group.eyebrow}</span><strong>{group.title}</strong></header>
+          <div>
+            {group.rows.map((row, index) => (
+              <button
+                key={row.symbol}
+                className={selectedSymbol === row.symbol ? "selected" : ""}
+                style={{ "--accent": COLORS[row.code] }}
+                onClick={() => onSelect(row.symbol)}
+              >
+                <i>{index + 1}</i>
+                <span><b>{row.displaySymbol}</b><small>{row.labelZh}</small></span>
+                <strong className={assetMetricTone(row, group.metric)}>{formatAssetSortValue(row, group.metric)}</strong>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function AssetResearchTable({ onSelect, onSort, rows, selectedSymbol, sortDirection, sortKey }) {
+  useEffect(() => {
+    const row = document.getElementById(`asset-research-row-${selectedSymbol}`);
+    const wrapper = row?.closest(".asset-research-table-wrap");
+    if (!row || !wrapper) return;
+    wrapper.scrollTo({ top: Math.max(0, row.offsetTop - wrapper.clientHeight / 2), behavior: "smooth" });
+  }, [selectedSymbol]);
+
   if (!rows.length) return <AssetEmptyState />;
   return (
     <div className="asset-research-table-wrap" data-testid="industry-view-b">
       <table className="asset-research-table">
         <thead>
           <tr>
-            <th>#</th><th>标的</th><th>Regime</th><th>1W</th><th>4W</th><th>13W</th><th>Rel SPY</th><th>Switch</th><th>20D Vol</th><th>52W DD</th><th>Confidence</th>
+            <th>#</th>
+            <AssetSortHead label="标的" name="symbol" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="Regime" name="regime" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="1W" name="weeklyReturn" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="4W" name="ret4w" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="13W" name="ret13w" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="Rel SPY" name="relativeToSpy13w" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="Switch" name="switchRisk" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="20D Vol" name="realizedVol20" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="52W DD" name="drawdown52w" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
+            <AssetSortHead label="Confidence" name="confidence" onSort={onSort} sortDirection={sortDirection} sortKey={sortKey} />
           </tr>
         </thead>
         <tbody>
           {rows.map((row, index) => (
-            <tr key={row.symbol} className={selectedSymbol === row.symbol ? "selected" : ""} onClick={() => onSelect(row.symbol)}>
+            <tr id={`asset-research-row-${row.symbol}`} key={row.symbol} className={selectedSymbol === row.symbol ? "selected" : ""} onClick={() => onSelect(row.symbol)}>
               <td>{String(index + 1).padStart(2, "0")}</td>
               <td><button onClick={() => onSelect(row.symbol)}><strong>{row.displaySymbol}</strong><span>{row.name}</span><em>{row.group}</em></button></td>
               <td><RegimeChip code={row.code} label={row.labelZh} /></td>
@@ -1079,7 +1208,20 @@ function AssetResearchTable({ onSelect, rows, selectedSymbol }) {
   );
 }
 
-function AssetRegimeMap({ onSelect, rows, selectedSymbol }) {
+function AssetSortHead({ label, name, onSort, sortDirection, sortKey }) {
+  const active = sortKey === name;
+  const ariaSort = active ? (sortDirection === "desc" ? "descending" : "ascending") : "none";
+  return (
+    <th aria-sort={ariaSort}>
+      <button className={active ? "active" : ""} onClick={() => onSort(name)}>
+        <span>{label}</span>
+        <i aria-hidden="true">{active ? (sortDirection === "desc" ? "↓" : "↑") : "↕"}</i>
+      </button>
+    </th>
+  );
+}
+
+function AssetRegimeMap({ compact = false, onSelect, rows, selectedSymbol }) {
   if (!rows.length) return <AssetEmptyState />;
   const points = rows.map((row) => ({
     row,
@@ -1105,7 +1247,7 @@ function AssetRegimeMap({ onSelect, rows, selectedSymbol }) {
   const selected = rows.find((row) => row.symbol === selectedSymbol) || rows[0];
 
   return (
-    <div className="asset-regime-map-layout" data-testid="industry-view-c">
+    <div className={`asset-regime-map-layout ${compact ? "compact" : ""}`} data-testid={compact ? "merged-regime-map" : "industry-view-c"}>
       <div className="asset-regime-map">
         <svg viewBox="0 0 980 540" role="img" aria-label="行业相对强弱与 Regime 切换风险地图">
           <rect x={left} y={top} width={Math.max(zeroX - left, 0)} height={Math.max(medianY - top, 0)} className="map-zone weak-fragile" />
@@ -2223,22 +2365,36 @@ function buildWeeklySummaryCharts(rows) {
 }
 
 function assetSortValue(row, key) {
+  if (key === "symbol") return row.displaySymbol || row.symbol;
+  if (key === "regime") return row.labelZh || row.code;
   if (key === "switchRisk") return numberValue(row.transition?.pressure);
   if (key === "confidence") return numberValue(row.confidence);
   return numberValue(row.metrics?.[key]);
 }
 
+function compareAssetRows(left, right, key) {
+  const leftValue = assetSortValue(left, key);
+  const rightValue = assetSortValue(right, key);
+  if (typeof leftValue === "string" || typeof rightValue === "string") {
+    const delta = String(leftValue).localeCompare(String(rightValue), "zh-CN");
+    return delta || left.displaySymbol.localeCompare(right.displaySymbol);
+  }
+  const delta = leftValue - rightValue;
+  return delta || left.displaySymbol.localeCompare(right.displaySymbol);
+}
+
 function formatAssetSortValue(row, key) {
   const value = assetSortValue(row, key);
+  if (key === "symbol" || key === "regime") return value;
   if (key === "switchRisk") return formatPressure(value);
-  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "drawdown52w"].includes(key)) {
+  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "ret4w", "drawdown52w"].includes(key)) {
     return formatSignedPercent(value);
   }
   return formatPercent(value);
 }
 
 function assetMetricTone(row, key) {
-  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "drawdown52w"].includes(key)) {
+  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "ret4w", "drawdown52w"].includes(key)) {
     return tone(assetSortValue(row, key));
   }
   return "";

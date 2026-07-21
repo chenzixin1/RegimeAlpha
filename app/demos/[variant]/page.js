@@ -3,11 +3,12 @@ import path from "node:path";
 import { notFound } from "next/navigation";
 import RegimeDashboard from "../../components/RegimeDashboard";
 
-const VARIANTS = new Set(["a", "b", "c"]);
+const VARIANTS = new Set(["a", "b", "c", "merged"]);
 const VARIANT_NAMES = {
   a: "Regime 排序卡片版",
   b: "Regime 研究表格版",
-  c: "Regime 强弱地图版"
+  c: "Regime 强弱地图版",
+  merged: "Regime 研究工作台"
 };
 
 export const dynamic = "force-static";

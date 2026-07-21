@@ -5,5 +5,5 @@ export const metadata = {
 };
 
 export default function DemoIndexPage() {
-  redirect("/demos/a/");
+  redirect("/demos/merged/");
 }
