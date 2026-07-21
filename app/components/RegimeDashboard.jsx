@@ -201,7 +201,35 @@ const CHAT_SUGGESTIONS = [
   "现在哪些指标最可能提示 regime 切换？"
 ];
 
-export default function RegimeDashboard({ initialData, previewConfig = null, initialPreviewCandles = null }) {
+const INDUSTRY_VARIANTS = {
+  a: {
+    label: "A",
+    title: "Regime 排序卡片",
+    description: "保留现有周 K 卡片，以模型原始字段重新排序。"
+  },
+  b: {
+    label: "B",
+    title: "Regime 研究表格",
+    description: "横向审计 Regime、趋势、风险与置信度。"
+  },
+  c: {
+    label: "C",
+    title: "Regime 强弱地图",
+    description: "用 Rel SPY 与 Switch Risk 定位板块分化。"
+  }
+};
+
+const ASSET_SORT_OPTIONS = [
+  { key: "ret13w", label: "13W 收益", defaultDirection: "desc" },
+  { key: "relativeToSpy13w", label: "Rel SPY", defaultDirection: "desc" },
+  { key: "weeklyReturn", label: "1W 收益", defaultDirection: "desc" },
+  { key: "switchRisk", label: "Switch Risk", defaultDirection: "asc" },
+  { key: "confidence", label: "Confidence", defaultDirection: "desc" },
+  { key: "realizedVol20", label: "20D Vol", defaultDirection: "asc" },
+  { key: "drawdown52w", label: "52W Drawdown", defaultDirection: "desc" }
+];
+
+export default function RegimeDashboard({ initialData, previewConfig = null, initialPreviewCandles = null, industryVariant = null }) {
   const [data, setData] = useState(initialData);
   const [previewCandles, setPreviewCandles] = useState(initialPreviewCandles);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
@@ -210,6 +238,11 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
   const [referenceCode, setReferenceCode] = useState(initialData.summary.latest.code);
   const [family, setFamily] = useState("all");
   const [query, setQuery] = useState("");
+  const [assetGroup, setAssetGroup] = useState("all");
+  const [assetRegimeCode, setAssetRegimeCode] = useState("all");
+  const [assetSortKey, setAssetSortKey] = useState("ret13w");
+  const [assetSortDirection, setAssetSortDirection] = useState("desc");
+  const [assetHistoryPeriod, setAssetHistoryPeriod] = useState("52W");
   const [heatmapTooltip, setHeatmapTooltip] = useState(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
@@ -293,6 +326,25 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
         .filter(Boolean),
     [assetRegimes, selected.weekEnd]
   );
+  const assetGroups = useMemo(
+    () => [...new Set(assetRowsForWeek.map((row) => row.group))],
+    [assetRowsForWeek]
+  );
+  const assetRegimeCodes = useMemo(
+    () => [...new Set(assetRowsForWeek.map((row) => row.code))],
+    [assetRowsForWeek]
+  );
+  const rankedAssetRows = useMemo(() => {
+    const direction = assetSortDirection === "asc" ? 1 : -1;
+    return assetRowsForWeek
+      .filter((row) => assetGroup === "all" || row.group === assetGroup)
+      .filter((row) => assetRegimeCode === "all" || row.code === assetRegimeCode)
+      .sort((left, right) => {
+        const delta = assetSortValue(left, assetSortKey) - assetSortValue(right, assetSortKey);
+        return delta === 0 ? left.displaySymbol.localeCompare(right.displaySymbol) : delta * direction;
+      });
+  }, [assetGroup, assetRegimeCode, assetRowsForWeek, assetSortDirection, assetSortKey]);
+  const marketAsset = assetRegimes.find((asset) => asset.symbol === "SPY") || assetRegimes[0];
   const byAssetWeek = useMemo(() => {
     const map = new Map();
     for (const asset of assetRegimes) {
@@ -411,12 +463,13 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-testid={industryVariant ? `full-demo-${industryVariant}` : undefined}>
       <header className="topbar">
         <div>
           <p className="kicker">RegimeAlpha / US Equities</p>
           <h1>美股周度 Regime 地图</h1>
           {previewConfig?.label ? <span className="preview-badge">{previewConfig.label}</span> : null}
+          {industryVariant ? <IndustryVariantNav activeVariant={industryVariant} /> : null}
         </div>
         <div className="freshness">
           <span>数据截至</span>
@@ -582,43 +635,101 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
           ) : null}
         </section>
 
-        <section className="asset-panel" id="asset-regime-panel">
+        <section className={`asset-panel ${industryVariant ? "industry-workspace" : ""}`} id="asset-regime-panel">
           <PanelTitle title="行业 / 产业 Regime" meta={`${selected.weekEnd} · ${assetRowsForWeek.length} proxies`} />
-          <div className={`asset-grid ${previewConfig?.showAssetWeekCandle ? "asset-grid-preview" : ""}`}>
-            {assetRowsForWeek.map((row) => (
-              <button
-                key={row.symbol}
-                className={`asset-tile ${previewConfig?.showAssetWeekCandle ? "asset-tile-preview" : ""} ${selectedAssetRow?.symbol === row.symbol ? "selected" : ""}`}
-                style={{ "--accent": COLORS[row.code] }}
-                onClick={() => setSelectedAssetSymbol(row.symbol)}
-                title={previewConfig?.showAssetWeekCandle ? undefined : `${row.displaySymbol} ${row.name} · ${row.labelZh}`}
-              >
-                {previewConfig?.showAssetWeekCandle ? (
-                  <AssetPreviewTileContent
-                    row={row}
-                    candle={previewCandles?.weekEnd === row.weekEnd ? previewCandles.candles?.[row.symbol] : null}
-                    definition={definitions[row.code]}
-                    strategies={data.strategyMap?.[row.code]}
-                  />
-                ) : (
-                  <>
-                    <span className="asset-topline">
-                      <strong>{row.displaySymbol}</strong>
-                      <em>{row.group}</em>
-                    </span>
-                    <span className="asset-name">{row.name}</span>
-                    <span className="asset-bottomline">
-                      <span className="asset-regime">
-                        <RegimeLogo code={row.code} size={18} />
-                        {row.labelZh}
+          {industryVariant ? (
+            <>
+              <IndustryVariantLead variant={industryVariant} />
+              <AssetUniverseControls
+                assetGroup={assetGroup}
+                assetGroups={assetGroups}
+                assetRegimeCode={assetRegimeCode}
+                assetRegimeCodes={assetRegimeCodes}
+                assetSortDirection={assetSortDirection}
+                assetSortKey={assetSortKey}
+                definitions={definitions}
+                onDirectionChange={() => setAssetSortDirection((value) => (value === "desc" ? "asc" : "desc"))}
+                onGroupChange={setAssetGroup}
+                onRegimeChange={setAssetRegimeCode}
+                onSortChange={(key) => {
+                  const option = ASSET_SORT_OPTIONS.find((item) => item.key === key);
+                  setAssetSortKey(key);
+                  setAssetSortDirection(option?.defaultDirection || "desc");
+                }}
+                resultCount={rankedAssetRows.length}
+                variant={industryVariant}
+              />
+              {industryVariant === "a" ? (
+                <AssetRankCardView
+                  definitions={definitions}
+                  onSelect={setSelectedAssetSymbol}
+                  previewCandles={previewCandles}
+                  rows={rankedAssetRows}
+                  selectedSymbol={selectedAssetRow?.symbol}
+                  sortKey={assetSortKey}
+                  strategyMap={data.strategyMap}
+                />
+              ) : null}
+              {industryVariant === "b" ? (
+                <AssetResearchTable
+                  onSelect={setSelectedAssetSymbol}
+                  rows={rankedAssetRows}
+                  selectedSymbol={selectedAssetRow?.symbol}
+                />
+              ) : null}
+              {industryVariant === "c" ? (
+                <AssetRegimeMap
+                  onSelect={setSelectedAssetSymbol}
+                  rows={rankedAssetRows}
+                  selectedSymbol={selectedAssetRow?.symbol}
+                />
+              ) : null}
+              <AssetHistoryDrilldown
+                asset={selectedAsset}
+                endWeek={selected.weekEnd}
+                market={marketAsset}
+                period={assetHistoryPeriod}
+                selectedRow={selectedAssetRow}
+                setPeriod={setAssetHistoryPeriod}
+              />
+            </>
+          ) : (
+            <div className={`asset-grid ${previewConfig?.showAssetWeekCandle ? "asset-grid-preview" : ""}`}>
+              {assetRowsForWeek.map((row) => (
+                <button
+                  key={row.symbol}
+                  className={`asset-tile ${previewConfig?.showAssetWeekCandle ? "asset-tile-preview" : ""} ${selectedAssetRow?.symbol === row.symbol ? "selected" : ""}`}
+                  style={{ "--accent": COLORS[row.code] }}
+                  onClick={() => setSelectedAssetSymbol(row.symbol)}
+                  title={previewConfig?.showAssetWeekCandle ? undefined : `${row.displaySymbol} ${row.name} · ${row.labelZh}`}
+                >
+                  {previewConfig?.showAssetWeekCandle ? (
+                    <AssetPreviewTileContent
+                      row={row}
+                      candle={previewCandles?.weekEnd === row.weekEnd ? previewCandles.candles?.[row.symbol] : null}
+                      definition={definitions[row.code]}
+                      strategies={data.strategyMap?.[row.code]}
+                    />
+                  ) : (
+                    <>
+                      <span className="asset-topline">
+                        <strong>{row.displaySymbol}</strong>
+                        <em>{row.group}</em>
                       </span>
-                      <b className={tone(row.metrics.ret13w)}>{formatPercent(row.metrics.ret13w)}</b>
-                    </span>
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
+                      <span className="asset-name">{row.name}</span>
+                      <span className="asset-bottomline">
+                        <span className="asset-regime">
+                          <RegimeLogo code={row.code} size={18} />
+                          {row.labelZh}
+                        </span>
+                        <b className={tone(row.metrics.ret13w)}>{formatPercent(row.metrics.ret13w)}</b>
+                      </span>
+                    </>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
           {soxSelected && igvSelected ? (
             <div className="split-callout">
               <span>SOX: {soxSelected.labelZh} / 13W {formatPercent(soxSelected.metrics.ret13w)}</span>
@@ -828,7 +939,337 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
   );
 }
 
-function AssetPreviewTileContent({ row, candle, definition, strategies }) {
+function IndustryVariantNav({ activeVariant }) {
+  return (
+    <nav className="industry-variant-nav" aria-label="完整方案切换">
+      {Object.entries(INDUSTRY_VARIANTS).map(([key, item]) => (
+        <a key={key} href={`/demos/${key}/`} aria-current={activeVariant === key ? "page" : undefined}>
+          <b>{item.label}</b>
+          <span>{item.title}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function IndustryVariantLead({ variant }) {
+  const meta = INDUSTRY_VARIANTS[variant];
+  return (
+    <div className="industry-variant-lead">
+      <span>Full Dashboard / Version {meta.label}</span>
+      <div>
+        <h4>{meta.title}</h4>
+        <p>{meta.description} Regime 标签、切换压力、置信度和历史序列仍由现有模型直接提供。</p>
+      </div>
+      <strong>无自定义综合分</strong>
+    </div>
+  );
+}
+
+function AssetUniverseControls({
+  assetGroup,
+  assetGroups,
+  assetRegimeCode,
+  assetRegimeCodes,
+  assetSortDirection,
+  assetSortKey,
+  definitions,
+  onDirectionChange,
+  onGroupChange,
+  onRegimeChange,
+  onSortChange,
+  resultCount,
+  variant
+}) {
+  return (
+    <div className="asset-universe-controls">
+      <div className="asset-control-group">
+        <span>资产范围</span>
+        <div className="asset-control-chips">
+          <button className={assetGroup === "all" ? "active" : ""} onClick={() => onGroupChange("all")}>全部</button>
+          {assetGroups.map((group) => (
+            <button key={group} className={assetGroup === group ? "active" : ""} onClick={() => onGroupChange(group)}>{group}</button>
+          ))}
+        </div>
+      </div>
+      <label className="asset-control-select">
+        <span>Regime</span>
+        <select value={assetRegimeCode} onChange={(event) => onRegimeChange(event.target.value)}>
+          <option value="all">全部 Regime</option>
+          {assetRegimeCodes.map((code) => <option key={code} value={code}>{definitions[code]?.labelZh || REGIME_LABELS_ZH[code] || code}</option>)}
+        </select>
+      </label>
+      {variant !== "c" ? (
+        <>
+          <label className="asset-control-select">
+            <span>排序字段</span>
+            <select value={assetSortKey} onChange={(event) => onSortChange(event.target.value)}>
+              {ASSET_SORT_OPTIONS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+            </select>
+          </label>
+          <button className="asset-direction-button" onClick={onDirectionChange}>
+            {assetSortDirection === "desc" ? "高 → 低" : "低 → 高"}
+          </button>
+        </>
+      ) : (
+        <div className="asset-axis-key"><span>横轴</span><b>Rel SPY 13W</b><span>纵轴</span><b>Switch Risk</b></div>
+      )}
+      <output>{resultCount} 个标的</output>
+    </div>
+  );
+}
+
+function AssetRankCardView({ definitions, onSelect, previewCandles, rows, selectedSymbol, sortKey, strategyMap }) {
+  if (!rows.length) return <AssetEmptyState />;
+  const sortLabel = ASSET_SORT_OPTIONS.find((option) => option.key === sortKey)?.label || sortKey;
+  return (
+    <div className="asset-grid asset-grid-preview asset-ranked-grid" data-testid="industry-view-a">
+      {rows.map((row, index) => (
+        <button
+          key={row.symbol}
+          className={`asset-tile asset-tile-preview asset-ranked-tile ${selectedSymbol === row.symbol ? "selected" : ""}`}
+          style={{ "--accent": COLORS[row.code] }}
+          onClick={() => onSelect(row.symbol)}
+          data-testid={`full-asset-${row.displaySymbol}`}
+        >
+          <span className="asset-rank-marker">#{String(index + 1).padStart(2, "0")}</span>
+          <span className="asset-sort-context">{sortLabel} <b className={assetMetricTone(row, sortKey)}>{formatAssetSortValue(row, sortKey)}</b></span>
+          <AssetPreviewTileContent
+            row={row}
+            candle={previewCandles?.candles?.[row.symbol]}
+            candleWeekEnd={previewCandles?.weekEnd}
+            definition={definitions[row.code]}
+            strategies={strategyMap?.[row.code]}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AssetResearchTable({ onSelect, rows, selectedSymbol }) {
+  if (!rows.length) return <AssetEmptyState />;
+  return (
+    <div className="asset-research-table-wrap" data-testid="industry-view-b">
+      <table className="asset-research-table">
+        <thead>
+          <tr>
+            <th>#</th><th>标的</th><th>Regime</th><th>1W</th><th>4W</th><th>13W</th><th>Rel SPY</th><th>Switch</th><th>20D Vol</th><th>52W DD</th><th>Confidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={row.symbol} className={selectedSymbol === row.symbol ? "selected" : ""} onClick={() => onSelect(row.symbol)}>
+              <td>{String(index + 1).padStart(2, "0")}</td>
+              <td><button onClick={() => onSelect(row.symbol)}><strong>{row.displaySymbol}</strong><span>{row.name}</span><em>{row.group}</em></button></td>
+              <td><RegimeChip code={row.code} label={row.labelZh} /></td>
+              <td className={tone(row.metrics.weeklyReturn)}>{formatSignedPercent(row.metrics.weeklyReturn)}</td>
+              <td className={tone(row.metrics.ret4w)}>{formatSignedPercent(row.metrics.ret4w)}</td>
+              <td className={tone(row.metrics.ret13w)}>{formatSignedPercent(row.metrics.ret13w)}</td>
+              <td className={tone(row.metrics.relativeToSpy13w)}>{formatSignedPercent(row.metrics.relativeToSpy13w)}</td>
+              <td className={transitionTone(row.transition)}>{formatPressure(row.transition?.pressure)}</td>
+              <td>{formatPercent(row.metrics.realizedVol20)}</td>
+              <td className={tone(row.metrics.drawdown52w)}>{formatPercent(row.metrics.drawdown52w)}</td>
+              <td>{formatPercent(row.confidence)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AssetRegimeMap({ onSelect, rows, selectedSymbol }) {
+  if (!rows.length) return <AssetEmptyState />;
+  const points = rows.map((row) => ({
+    row,
+    x: numberValue(row.metrics.relativeToSpy13w),
+    y: numberValue(row.transition?.pressure)
+  }));
+  const xValues = points.map((point) => point.x);
+  const yValues = points.map((point) => point.y);
+  const xMin = Math.min(...xValues, 0);
+  const xMax = Math.max(...xValues, 0);
+  const xMargin = Math.max((xMax - xMin) * 0.12, 0.02);
+  const medianDistance = median(xValues.map((value) => Math.abs(value)));
+  const yMax = Math.max(...yValues, 0.5);
+  const yMedian = median(yValues);
+  const left = 82;
+  const right = 918;
+  const top = 54;
+  const bottom = 476;
+  const sx = (value) => left + ((value - (xMin - xMargin)) / Math.max(xMax - xMin + xMargin * 2, 0.01)) * (right - left);
+  const sy = (value) => bottom - (value / Math.max(yMax * 1.08, 0.01)) * (bottom - top);
+  const zeroX = sx(0);
+  const medianY = sy(yMedian);
+  const selected = rows.find((row) => row.symbol === selectedSymbol) || rows[0];
+
+  return (
+    <div className="asset-regime-map-layout" data-testid="industry-view-c">
+      <div className="asset-regime-map">
+        <svg viewBox="0 0 980 540" role="img" aria-label="行业相对强弱与 Regime 切换风险地图">
+          <rect x={left} y={top} width={Math.max(zeroX - left, 0)} height={Math.max(medianY - top, 0)} className="map-zone weak-fragile" />
+          <rect x={zeroX} y={top} width={Math.max(right - zeroX, 0)} height={Math.max(medianY - top, 0)} className="map-zone strong-fragile" />
+          <rect x={left} y={medianY} width={Math.max(zeroX - left, 0)} height={Math.max(bottom - medianY, 0)} className="map-zone weak-stable" />
+          <rect x={zeroX} y={medianY} width={Math.max(right - zeroX, 0)} height={Math.max(bottom - medianY, 0)} className="map-zone strong-stable" />
+          <line x1={zeroX} x2={zeroX} y1={top} y2={bottom} className="map-benchmark" />
+          <line x1={left} x2={right} y1={medianY} y2={medianY} className="map-benchmark median" />
+          <line x1={left} x2={right} y1={bottom} y2={bottom} className="map-axis" />
+          <line x1={left} x2={left} y1={top} y2={bottom} className="map-axis" />
+          <text x={left + 14} y={top + 24} className="map-zone-label">弱势 / 高切换</text>
+          <text x={zeroX + 14} y={top + 24} className="map-zone-label">强势 / 高切换</text>
+          <text x={left + 14} y={bottom - 16} className="map-zone-label">弱势 / 稳定</text>
+          <text x={zeroX + 14} y={bottom - 16} className="map-zone-label">强势 / 稳定</text>
+          <text x={(left + right) / 2} y="526" textAnchor="middle" className="map-axis-label">相对 SPY 13W →</text>
+          <text x="21" y={(top + bottom) / 2} textAnchor="middle" transform={`rotate(-90 21 ${(top + bottom) / 2})`} className="map-axis-label">Switch Risk →</text>
+          <text x={zeroX + 7} y={bottom + 19} className="map-tick">0%</text>
+          <text x={left - 8} y={medianY + 4} textAnchor="end" className="map-tick">中位 {formatPressure(yMedian)}</text>
+          {points.map(({ row, x, y }, index) => {
+            const active = row.symbol === selected.symbol;
+            const radius = 7 + numberValue(row.confidence) * 6;
+            const labelY = index % 3 === 0 ? -10 : index % 3 === 1 ? 15 : 3;
+            const showLabel = active || y >= yMedian || Math.abs(x) >= medianDistance;
+            return (
+              <g
+                key={row.symbol}
+                className={`asset-map-point ${active ? "active" : ""}`}
+                transform={`translate(${sx(x)} ${sy(y)})`}
+                role="button"
+                tabIndex="0"
+                aria-label={`${row.displaySymbol}，${row.labelZh}，相对 SPY ${formatSignedPercent(x)}，切换风险 ${formatPressure(y)}`}
+                onClick={() => onSelect(row.symbol)}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelect(row.symbol); }}
+              >
+                <circle r="24" className="asset-map-hit" />
+                <circle r={radius} fill={COLORS[row.code]} className="asset-map-dot" />
+                {active ? <circle r={radius + 6} className="asset-map-ring" /> : null}
+                <text className={showLabel ? "asset-map-label" : "asset-map-label deemphasized"} x={radius + 5} y={labelY}>{row.displaySymbol}</text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <aside className="asset-map-readout" style={{ "--accent": COLORS[selected.code] }}>
+        <span>当前选择</span>
+        <div><RegimeLogo code={selected.code} size={26} /><strong>{selected.displaySymbol}</strong></div>
+        <h4>{selected.name}</h4>
+        <RegimeChip code={selected.code} label={selected.labelZh} />
+        <dl>
+          <div><dt>Rel SPY 13W</dt><dd className={tone(selected.metrics.relativeToSpy13w)}>{formatSignedPercent(selected.metrics.relativeToSpy13w)}</dd></div>
+          <div><dt>Switch Risk</dt><dd>{formatPressure(selected.transition?.pressure)}</dd></div>
+          <div><dt>13W</dt><dd className={tone(selected.metrics.ret13w)}>{formatSignedPercent(selected.metrics.ret13w)}</dd></div>
+          <div><dt>Confidence</dt><dd>{formatPercent(selected.confidence)}</dd></div>
+        </dl>
+        <p>坐标直接来自现有模型字段；颜色仍表示当前 Regime，点大小表示模型置信度。</p>
+      </aside>
+    </div>
+  );
+}
+
+function AssetHistoryDrilldown({ asset, endWeek, market, period, selectedRow, setPeriod }) {
+  if (!asset || !selectedRow) return null;
+  const history = assetHistoryRows(asset, endWeek, period);
+  const distribution = regimeDistribution(history);
+  const transitions = recentRegimeTransitions(history);
+  return (
+    <section className="asset-history-drilldown" data-testid="asset-history" style={{ "--accent": COLORS[selectedRow.code] }}>
+      <header className="asset-history-head">
+        <div>
+          <span>Asset Drill-down / 截止 {endWeek}</span>
+          <h3><RegimeLogo code={selectedRow.code} size={24} />{asset.displaySymbol} · {asset.name}</h3>
+          <p>从当前周向前查看价格相对表现、Regime 序列、状态占比与最近切换，不再只看一周。</p>
+        </div>
+        <div className="asset-history-periods" role="tablist" aria-label="资产历史区间">
+          {["12W", "52W", "5Y"].map((item) => (
+            <button key={item} role="tab" aria-selected={period === item} onClick={() => setPeriod(item)}>{item}</button>
+          ))}
+        </div>
+      </header>
+      <div className="asset-history-grid">
+        <div className="asset-history-chart-block">
+          <div className="asset-history-subhead"><strong>{asset.displaySymbol} vs SPY</strong><span>区间归一化表现</span></div>
+          <AssetHistoryChart asset={asset} endWeek={endWeek} market={market} period={period} />
+          <AssetRegimeRibbon history={history} />
+        </div>
+        <div className="asset-history-distribution">
+          <div className="asset-history-subhead"><strong>Regime 占比</strong><span>{history.length} weeks</span></div>
+          <div className="asset-distribution-list">
+            {distribution.slice(0, 5).map((item) => (
+              <div key={item.code} style={{ "--accent": COLORS[item.code] }}>
+                <RegimeLogo code={item.code} size={18} />
+                <span>{item.label}</span>
+                <i><b style={{ width: `${item.share * 100}%` }} /></i>
+                <strong>{formatPercent(item.share, 0)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="asset-history-transitions">
+          <div className="asset-history-subhead"><strong>最近切换</strong><span>newest first</span></div>
+          {transitions.length ? transitions.map((item) => (
+            <div key={`${item.weekEnd}-${item.code}`}>
+              <time>{item.weekEnd}</time>
+              <RegimeChip code={item.code} label={item.labelZh} mini />
+            </div>
+          )) : <p>所选区间内没有 Regime 切换。</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AssetHistoryChart({ asset, endWeek, market, period }) {
+  const assetRows = assetHistoryRows(asset, endWeek, period);
+  const marketMap = new Map((market?.regimes || []).map((row) => [row.weekEnd, row]));
+  const aligned = assetRows.map((row) => ({ asset: row, market: marketMap.get(row.weekEnd) })).filter((item) => item.market);
+  if (aligned.length < 2) return <div className="asset-history-empty">历史数据不足</div>;
+  const assetStart = numberValue(aligned[0].asset.metrics?.close, 1);
+  const marketStart = numberValue(aligned[0].market.metrics?.close, 1);
+  const assetSeries = aligned.map((item) => numberValue(item.asset.metrics?.close) / assetStart - 1);
+  const marketSeries = aligned.map((item) => numberValue(item.market.metrics?.close) / marketStart - 1);
+  const values = [...assetSeries, ...marketSeries, 0];
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const margin = Math.max((rawMax - rawMin) * 0.12, 0.03);
+  const min = rawMin - margin;
+  const max = rawMax + margin;
+  const width = 760;
+  const height = 250;
+  const left = 48;
+  const right = 744;
+  const top = 22;
+  const bottom = 218;
+  const sx = (index) => left + (index / Math.max(aligned.length - 1, 1)) * (right - left);
+  const sy = (value) => top + ((max - value) / Math.max(max - min, 0.01)) * (bottom - top);
+  const line = (series) => series.map((value, index) => `${index ? "L" : "M"}${sx(index).toFixed(1)},${sy(value).toFixed(1)}`).join(" ");
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => max - (max - min) * ratio);
+  return (
+    <svg className="asset-history-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${asset.displaySymbol} 与 SPY 的 ${period} 归一化表现`}>
+      {ticks.map((tick) => <g key={tick}><line x1={left} x2={right} y1={sy(tick)} y2={sy(tick)} /><text x={left - 8} y={sy(tick) + 4} textAnchor="end">{formatPercent(tick, 0)}</text></g>)}
+      <path d={line(marketSeries)} className="asset-history-market-line" />
+      <path d={line(assetSeries)} className="asset-history-asset-line" />
+      <g className="asset-history-legend"><circle cx="60" cy="12" r="3" /><text x="68" y="16">{asset.displaySymbol}</text><line x1="142" x2="164" y1="12" y2="12" /><text x="171" y="16">SPY</text></g>
+      <text x={left} y="244">{aligned[0].asset.weekEnd.slice(0, 7)}</text>
+      <text x={right} y="244" textAnchor="end">{aligned.at(-1).asset.weekEnd.slice(0, 7)}</text>
+    </svg>
+  );
+}
+
+function AssetRegimeRibbon({ history }) {
+  return (
+    <div className="asset-regime-ribbon">
+      <span>Regime 序列</span>
+      <div>{history.map((row) => <i key={row.weekEnd} style={{ background: COLORS[row.code] }} title={`${row.weekEnd} · ${row.labelZh}`} />)}</div>
+      <small>{history[0]?.weekEnd} → {history.at(-1)?.weekEnd}</small>
+    </div>
+  );
+}
+
+function AssetEmptyState() {
+  return <div className="asset-empty-state"><strong>当前筛选没有标的</strong><span>调整资产范围或 Regime 条件后重新查看。</span></div>;
+}
+
+function AssetPreviewTileContent({ row, candle, candleWeekEnd = null, definition, strategies }) {
   const explainer = REGIME_EXPLAINERS[row.code] || {};
   const tooltipId = `asset-regime-tip-${row.symbol}`;
 
@@ -854,7 +1295,7 @@ function AssetPreviewTileContent({ row, candle, definition, strategies }) {
 
       <span className="asset-preview-chart">
         <MiniCandlestickStrip candle={candle} variant="wide" />
-        <span className="asset-candle-meta">本周日 K</span>
+        <span className="asset-candle-meta">{candleWeekEnd && candleWeekEnd !== row.weekEnd ? `日 K · 截至 ${formatShortDate(candleWeekEnd)}` : "本周日 K"}</span>
       </span>
 
       <span className="asset-preview-metrics">
@@ -1781,6 +2222,67 @@ function buildWeeklySummaryCharts(rows) {
   };
 }
 
+function assetSortValue(row, key) {
+  if (key === "switchRisk") return numberValue(row.transition?.pressure);
+  if (key === "confidence") return numberValue(row.confidence);
+  return numberValue(row.metrics?.[key]);
+}
+
+function formatAssetSortValue(row, key) {
+  const value = assetSortValue(row, key);
+  if (key === "switchRisk") return formatPressure(value);
+  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "drawdown52w"].includes(key)) {
+    return formatSignedPercent(value);
+  }
+  return formatPercent(value);
+}
+
+function assetMetricTone(row, key) {
+  if (["ret13w", "relativeToSpy13w", "weeklyReturn", "drawdown52w"].includes(key)) {
+    return tone(assetSortValue(row, key));
+  }
+  return "";
+}
+
+function assetHistoryRows(asset, endWeek, period) {
+  const count = period === "12W" ? 12 : period === "52W" ? 52 : 261;
+  const rows = asset?.regimes || [];
+  let endIndex = rows.length - 1;
+  while (endIndex > 0 && rows[endIndex].weekEnd > endWeek) endIndex -= 1;
+  return rows.slice(Math.max(0, endIndex - count + 1), endIndex + 1);
+}
+
+function regimeDistribution(history) {
+  const counts = new Map();
+  for (const row of history) {
+    const current = counts.get(row.code) || { code: row.code, label: row.labelZh, count: 0 };
+    current.count += 1;
+    counts.set(row.code, current);
+  }
+  return [...counts.values()]
+    .map((item) => ({ ...item, share: history.length ? item.count / history.length : 0 }))
+    .sort((left, right) => right.count - left.count);
+}
+
+function recentRegimeTransitions(history) {
+  const transitions = [];
+  for (let index = 1; index < history.length; index += 1) {
+    if (history[index].code !== history[index - 1].code) transitions.push(history[index]);
+  }
+  return transitions.slice(-6).reverse();
+}
+
+function median(values) {
+  const sorted = values.filter(Number.isFinite).sort((left, right) => left - right);
+  if (!sorted.length) return 0;
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function numberValue(value, fallback = 0) {
+  return Number.isFinite(value) ? value : fallback;
+}
+
 function downloadCsv(rows, assetRegimes = []) {
   const headers = ["scope", "symbol", "displaySymbol", "weekStart", "weekEnd", "regime", "regimeZh", "baselineRegime", "transitionPressure", "transitionStatus", "likelyNext", "confidence", "weeklyReturn", "ret13w", "relativeToSpy13w", "vix", "realizedVol20", "downVolumeZ20", "distributionDay", "correlationToSpy63"];
   const lines = [
@@ -1845,8 +2347,8 @@ function downloadCsv(rows, assetRegimes = []) {
   URL.revokeObjectURL(url);
 }
 
-function formatPercent(value) {
-  return Number.isFinite(value) ? `${(value * 100).toFixed(1)}%` : "-";
+function formatPercent(value, digits = 1) {
+  return Number.isFinite(value) ? `${(value * 100).toFixed(digits)}%` : "-";
 }
 
 function formatSignedPercent(value) {
