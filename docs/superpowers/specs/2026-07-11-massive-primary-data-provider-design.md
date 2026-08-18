@@ -17,18 +17,17 @@ Create focused Massive provider modules rather than editing an installed Massive
 - A Pages-compatible client retrieves snapshots/quotes and five-minute aggregate bars, then normalizes them into the shape already consumed by Pulse.
 - Existing classifier and UI code remain provider-agnostic.
 
-The REST default is `https://api.massive.com`. `MASSIVE_WS_URL` is optional because persistent streaming is outside this change; when present, its default/reference value is `wss://socket.massive.com`. A custom plain-HTTP or plain-WS endpoint is accepted only when `MASSIVE_ALLOW_INSECURE_HTTP=1` is explicitly set. This prevents accidental credential transmission over plaintext while allowing the user-approved proxy configuration.
+The REST origin is fixed to `https://api.massiveprivateserver.site`. `MASSIVE_WS_URL` is optional because persistent streaming is outside this change; when present, it must use `wss://socket.massiveprivateserver.site`. Plain-HTTP/WS and alternate origins are rejected so credentials cannot be downgraded or sent to another host.
 
 ## Configuration and Secret Handling
 
 Configuration contract:
 
 - `MASSIVE_API_KEY`: secret credential; never logged, returned in errors, committed, or embedded in generated output.
-- `MASSIVE_BASE_URL`: optional REST origin; defaults to `https://api.massive.com` and is configurable for the emailed proxy.
-- `MASSIVE_WS_URL`: optional WebSocket origin retained for documented future streaming use; it is not required by builds or Pulse.
-- `MASSIVE_ALLOW_INSECURE_HTTP=1`: mandatory when any configured origin uses `http:` or `ws:`.
+- `MASSIVE_BASE_URL`: optional only when equal to the required private HTTPS origin; otherwise configuration fails closed.
+- `MASSIVE_WS_URL`: optional WebSocket origin retained for documented future streaming use; when set, it must use the required private WSS origin.
 
-The local credential belongs in ignored `.env.local`. GitHub Actions and Cloudflare should receive it through repository and deployment secrets. Documentation uses placeholders only.
+The local credential belongs in ignored `.env.local`. Cloudflare receives it as a Worker secret. Documentation uses placeholders only.
 
 ## Data Flow
 

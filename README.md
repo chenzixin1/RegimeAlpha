@@ -29,13 +29,13 @@ MASSIVE_API_KEY="your_massive_key" FMP_API_KEY="your_fmp_key" npm run update:dat
 - 缓存：本地优先使用 `.cache/regime-alpha.sqlite` 缓存 Massive 原始响应和周度 regime 结果；`REGIME_REFRESH=1` 可跳过缓存重拉。
 - 前端数据：脚本同时输出 `data/regimes.json` 和 `public/data/regimes.json`，页面不直接调用 Massive。
 - 数据源：Massive 优先提供美股/ETF 行情；FMP 提供 VIX、KOSPI、日经等指数，并在 Massive 缺失时回退。
-- 密钥：脚本从 `MASSIVE_API_KEY` 和 `FMP_API_KEY` 环境变量读取，前端源码不包含 API key。自定义明文代理还必须显式设置 `MASSIVE_ALLOW_INSECURE_HTTP=1`。
+- 密钥：脚本从 `MASSIVE_API_KEY` 和 `FMP_API_KEY` 环境变量读取，前端源码不包含 API key。Massive REST 固定使用加密的私有代理 origin，拒绝明文 HTTP 和其他主机。
 
 ## Cloudflare Worker 自动更新
 
-正式站点可以由 `regimealpha-updater` Worker 定时触发数据刷新。Worker 每周二到周六北京时间 07:40 运行一次，触发 GitHub Actions 工作流；Actions 在 Node 环境里只拉取最近一段 Massive 历史行情，重算尾部窗口，重新构建 Pages，并把最新 `data/regimes.json` 与 `public/data/regimes.json` 提交回 `main`。
+正式站点由 `regimealpha-updater` Worker 在每周六北京时间 08:15 直接运行增量刷新。Worker 读取当前 D1 快照，拉取最近一段 Massive/FMP 历史行情，在内存中重算尾部窗口，并把版本化、规范化的数据写回 D1。周五休市时生成器会自然使用当周最后一个美股交易日。
 
-站点加载时会先使用构建时内置的静态数据，然后在浏览器端请求 Pages 静态文件 `/data/regimes.json`。`regimealpha-updater` 只接管 `/api/regime-update/*`，不接管 `/data/regimes.json`，避免大 JSON 经过 Worker/KV 动态响应变慢。
+`active_snapshot` 只在所有数据行写入完成后切换，前端不会读到半成品。Worker 从 D1 提供 `/data/regimes.json`、预览蜡烛和按市场/资产查询的 API；Pages 内置 JSON 只作为首次部署种子和静态回退。完整设计见 [`docs/data-architecture.md`](docs/data-architecture.md)。
 
 常用命令：
 
@@ -43,15 +43,13 @@ MASSIVE_API_KEY="your_massive_key" FMP_API_KEY="your_fmp_key" npm run update:dat
 npm run deploy:worker
 ```
 
-Worker 需要两个 secret：
+Worker 需要三个 secret：
 
-- `GITHUB_DISPATCH_TOKEN`：用于触发 GitHub Actions workflow dispatch。
-- `UPDATE_TOKEN`：手动触发 `/api/regime-update/run` 和 Actions 发布 `/api/regime-update/publish` 时使用的 bearer token 或 `token` query。
+- `MASSIVE_API_KEY`：Massive 行情密钥。
+- `FMP_API_KEY`：FMP 指数行情密钥。
+- `UPDATE_TOKEN`：手动触发和故障恢复发布使用的 bearer token。
 
-GitHub Actions 需要两个 repository secret：
-
-- `MASSIVE_API_KEY`：Massive 数据密钥。
-- `WORKER_UPDATE_TOKEN`：与 Worker 的 `UPDATE_TOKEN` 相同，用于把生成后的 JSON 发布回 Worker。
+所有 Massive REST 请求固定通过 `https://api.massiveprivateserver.site`，API key 仅保存在 Worker Secret 中；代码不会回退到 Massive 官方 API，也不会使用明文 HTTP 传输密钥。
 
 日常自动任务使用 `npm run update:data:incremental`，默认只重算最近约 120 天的周度输出，并为 52 周回撤、200 日均线、相关性等指标向前补取约 460 天上下文；`npm run update:data` 仍保留为全量 5 年兜底重建。
 
@@ -124,15 +122,11 @@ REGIME_MCP_URL=https://regimealpha.chenzixin.uk/mcp npm run verify:mcp-strategy
 npm run deploy:mcp
 ```
 
-## GitHub 自动刷新
+## 人工恢复
 
-仓库包含 `.github/workflows/daily-data-refresh.yml`，会在工作日 22:30 UTC 运行，也可以在 GitHub Actions 页面手动触发。流程会强制刷新 Massive 数据、执行静态构建、比较 `metadata.dataThrough`，只有数据日期推进时才部署 Cloudflare Pages 并提交 `data/regimes.json` 与 `public/data/regimes.json`。
+需要人工重跑时，使用 bearer token 调用 `POST /api/regime-update/run`。仓库不再包含市场数据 GitHub workflow；正常更新完全在 Cloudflare Worker 和 D1 内完成，不需要本地 Codex、Container、GitHub Actions、提交生成 JSON 或重复部署 Pages。
 
-GitHub Secrets 需要配置：
-
-- `MASSIVE_API_KEY`：Massive 数据密钥。
-- `CLOUDFLARE_ACCOUNT_ID`：Cloudflare account ID。
-- `CLOUDFLARE_API_TOKEN`：有 Cloudflare Pages 写权限的 API token。
+全新空 D1 的一次性恢复流程见 [`docs/data-architecture.md`](docs/data-architecture.md)：由本地工具从仓库内 seed JSON 生成可审查的 SQL 文件后导入，不开放公网数据上传接口。
 
 ## Vercel 口径
 

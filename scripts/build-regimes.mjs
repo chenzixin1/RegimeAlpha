@@ -2,38 +2,28 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname } from "node:path";
-import { resolveMassiveConfig } from "../lib/massive-config.js";
 import { fetchMassiveAggregates, normalizeMassiveBars, toMassiveSymbol } from "../lib/massive-client.js";
-import { fetchFmpDaily, resolveFmpConfig } from "../lib/fmp-client.js";
+import { fetchFmpDaily } from "../lib/fmp-client.js";
 
-loadLocalEnv([".env.local", ".env"]);
-
-const MASSIVE_CONFIG = resolveMassiveConfig(process.env);
-const FMP_CONFIG = resolveFmpConfig(process.env);
 const FMP_PRIMARY_SYMBOLS = new Set(["^VIX", "^KS11", "^N225"]);
-const AS_OF = process.env.AS_OF_DATE || new Date().toISOString().slice(0, 10);
-const REFRESH = process.env.REGIME_REFRESH === "1";
-const INCREMENTAL = process.env.REGIME_INCREMENTAL === "1";
-const PREVIOUS_PAYLOAD_PATH = process.env.REGIME_PREVIOUS_PAYLOAD || "data/regimes.json";
-const SQLITE_BIN = process.env.SQLITE_BIN || "sqlite3";
-const SQLITE_PATH = process.env.REGIME_SQLITE_PATH || ".cache/regime-alpha.sqlite";
-const SQLITE_ENABLED = process.env.REGIME_CACHE !== "off" && commandExists(SQLITE_BIN);
-
 const DAY = 24 * 60 * 60 * 1000;
-const PREVIOUS_PAYLOAD = INCREMENTAL ? readPreviousPayload(PREVIOUS_PAYLOAD_PATH) : null;
-const OUTPUT_END = parseDate(AS_OF);
-const FULL_OUTPUT_START = addYears(OUTPUT_END, -5);
-const INCREMENTAL_REPLACE_START = PREVIOUS_PAYLOAD?.metadata?.dataThrough
-  ? startOfWeek(addDays(parseDate(PREVIOUS_PAYLOAD.metadata.dataThrough), -120))
-  : FULL_OUTPUT_START;
-const OUTPUT_START = process.env.REGIME_OUTPUT_START_DATE
-  ? parseDate(process.env.REGIME_OUTPUT_START_DATE)
-  : INCREMENTAL
-    ? maxDate(FULL_OUTPUT_START, INCREMENTAL_REPLACE_START)
-    : FULL_OUTPUT_START;
-const FETCH_START = process.env.REGIME_FETCH_START_DATE
-  ? parseDate(process.env.REGIME_FETCH_START_DATE)
-  : addDays(OUTPUT_START, -460);
+let MASSIVE_CONFIG;
+let FMP_CONFIG;
+let AS_OF;
+let REFRESH;
+let INCREMENTAL;
+let PREVIOUS_PAYLOAD;
+let PREVIOUS_DATA_THROUGH;
+let OUTPUT_END;
+let FULL_OUTPUT_START;
+let OUTPUT_START;
+let FETCH_START;
+let SQLITE_BIN;
+let SQLITE_PATH;
+let SQLITE_ENABLED;
+let DAILY_ROWS_TOTAL;
+let MAX_DAILY_ROWS_PER_SYMBOL;
+let MAX_TOTAL_DAILY_ROWS;
 
 const PRIMARY_SYMBOLS = ["SPY", "^VIX", "TLT", "QQQ", "IWM"];
 const BROAD_SECTOR_PROXIES = [
@@ -70,7 +60,7 @@ const INTERNATIONAL_PROXIES = [
   { symbol: "^N225", displaySymbol: "Nikkei 225", name: "Nikkei 225", group: "International", proxyNote: "FMP ^N225 is used as the Japan/Nikkei equity index proxy." }
 ];
 
-function loadLocalEnv(paths) {
+export function loadLocalEnv(paths) {
   for (const envPath of paths) {
     if (!existsSync(envPath)) {
       continue;
@@ -237,17 +227,22 @@ const STRATEGIES = {
   }
 };
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-
-async function main() {
-  initCache();
+export async function generateRegimeData(options) {
+  configureRuntime(options);
+  if (SQLITE_ENABLED) initCache();
+  const progress = options?.onProgress || (() => {});
   const series = {};
   await pool(SYMBOLS, 4, async (symbol) => {
-    series[symbol] = await fetchDaily(symbol);
-    console.log(`${symbol.padEnd(5)} ${series[symbol].length} rows`);
+    const rows = await fetchDaily(symbol);
+    if (rows.length > MAX_DAILY_ROWS_PER_SYMBOL) {
+      throw new Error(`${symbol} exceeded the per-symbol daily row budget.`);
+    }
+    DAILY_ROWS_TOTAL += rows.length;
+    if (DAILY_ROWS_TOTAL > MAX_TOTAL_DAILY_ROWS) {
+      throw new Error("Market data exceeded the refresh-wide daily row budget.");
+    }
+    series[symbol] = rows;
+    progress(`${symbol.padEnd(5)} ${series[symbol].length} rows`);
   });
 
   validateSeries(series);
@@ -294,8 +289,16 @@ async function main() {
     payload = mergeIncrementalPayload(PREVIOUS_PAYLOAD, payload);
   }
 
-  saveRegimeRows(payload);
+  if (SQLITE_ENABLED) saveRegimeRows(payload);
+  if (INCREMENTAL) {
+    progress(
+      `Incremental mode: fetched from ${formatDate(FETCH_START)}, recalculated weeks from ${formatDate(OUTPUT_START)}.`
+    );
+  }
+  return { payload, assetWeekCandles };
+}
 
+export async function writeGeneratedData({ payload, assetWeekCandles, onProgress = console.log }) {
   await mkdir("data", { recursive: true });
   await mkdir("public/data", { recursive: true });
   const json = `${JSON.stringify(payload, null, 2)}\n`;
@@ -303,22 +306,46 @@ async function main() {
   await writeFile("data/regimes.json", json);
   await writeFile("public/data/regimes.json", json);
   await writeFile("public/local-preview-candles.json", candleJson);
-  console.log(
+  onProgress(
     `Wrote data/regimes.json and public/data/regimes.json with ${payload.regimes.length} weekly regimes through ${payload.metadata.dataThrough}.`
   );
-  console.log(
+  onProgress(
     `Wrote public/local-preview-candles.json with ${Object.keys(assetWeekCandles.candles || {}).length} asset candle strips through ${assetWeekCandles.weekEnd}.`
   );
-  if (INCREMENTAL) {
-    console.log(
-      `Incremental mode: fetched from ${formatDate(FETCH_START)}, recalculated weeks from ${formatDate(OUTPUT_START)}.`
-    );
+}
+
+function configureRuntime(options = {}) {
+  MASSIVE_CONFIG = options.massiveConfig;
+  FMP_CONFIG = options.fmpConfig;
+  if (!MASSIVE_CONFIG?.apiKey || !MASSIVE_CONFIG?.baseUrl || !FMP_CONFIG?.apiKey || !FMP_CONFIG?.baseUrl) {
+    throw new Error("Massive and FMP provider configuration is required.");
   }
-  if (SQLITE_ENABLED) {
-    console.log(`SQLite cache: ${SQLITE_PATH}`);
-  } else {
-    console.log("SQLite cache unavailable; fetched directly.");
-  }
+
+  AS_OF = options.asOf || new Date().toISOString().slice(0, 10);
+  REFRESH = options.refresh !== false;
+  PREVIOUS_PAYLOAD = options.previousPayload || null;
+  PREVIOUS_DATA_THROUGH = options.previousDataThrough || PREVIOUS_PAYLOAD?.metadata?.dataThrough || null;
+  INCREMENTAL = options.incremental ?? Boolean(PREVIOUS_PAYLOAD);
+  OUTPUT_END = parseDate(AS_OF);
+  FULL_OUTPUT_START = addYears(OUTPUT_END, -5);
+  const incrementalReplaceStart = PREVIOUS_DATA_THROUGH
+    ? startOfWeek(addDays(parseDate(PREVIOUS_DATA_THROUGH), -120))
+    : FULL_OUTPUT_START;
+  OUTPUT_START = options.outputStartDate
+    ? parseDate(options.outputStartDate)
+    : INCREMENTAL
+      ? maxDate(FULL_OUTPUT_START, incrementalReplaceStart)
+      : FULL_OUTPUT_START;
+  FETCH_START = options.fetchStartDate
+    ? parseDate(options.fetchStartDate)
+    : addDays(OUTPUT_START, -460);
+  SQLITE_BIN = options.sqliteBin || "sqlite3";
+  SQLITE_PATH = options.sqlitePath || ".cache/regime-alpha.sqlite";
+  SQLITE_ENABLED = Boolean(options.sqliteEnabled) && commandExists(SQLITE_BIN);
+  const requestedDays = Math.ceil((OUTPUT_END.getTime() - FETCH_START.getTime()) / DAY) + 1;
+  MAX_DAILY_ROWS_PER_SYMBOL = options.maxDailyRowsPerSymbol || Math.min(2500, requestedDays + 5);
+  MAX_TOTAL_DAILY_ROWS = options.maxTotalDailyRows || MAX_DAILY_ROWS_PER_SYMBOL * SYMBOLS.length;
+  DAILY_ROWS_TOTAL = 0;
 }
 
 async function fetchDaily(symbol) {
@@ -1325,7 +1352,7 @@ function startOfWeek(date) {
   return addDays(date, 1 - day);
 }
 
-function readPreviousPayload(filePath) {
+export function readPreviousPayload(filePath) {
   if (!existsSync(filePath)) return null;
   try {
     return JSON.parse(readFileSync(filePath, "utf8"));

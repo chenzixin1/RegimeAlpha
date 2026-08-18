@@ -31,8 +31,9 @@ export default async function Home() {
       previewConfig={{
         label: "完整方案 MERGED · Regime 研究工作台",
         showAssetWeekCandle: true,
-        disableDataRefresh: true,
-        candleDataUrl: "/local-preview-candles.json",
+        disableDataRefresh: false,
+        refreshDataUrl: "/data/regimes.json",
+        candleDataUrl: "/data/local-preview-candles.json",
         syncSelectedWeekToLatest: true
       }}
     />

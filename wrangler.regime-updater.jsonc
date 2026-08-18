@@ -2,18 +2,47 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "regimealpha-updater",
   "main": "workers/regime-updater.js",
-  "compatibility_date": "2026-05-23",
+  "compatibility_date": "2026-08-18",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  "triggers": {
-    "crons": ["40 23 * * 1-5"]
+  "observability": {
+    "enabled": true
   },
-  "kv_namespaces": [
+  "limits": {
+    "cpu_ms": 300000
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://regimealpha.chenzixin.uk",
+    "MASSIVE_BASE_URL": "https://api.massiveprivateserver.site"
+  },
+  "triggers": {
+    "crons": ["15 0 * * 6"]
+  },
+  "d1_databases": [
     {
-      "binding": "REGIME_KV",
-      "id": "fe3bc31a03de42deabe70a988717e313"
+      "binding": "REGIME_DB",
+      "database_name": "regimealpha-production",
+      "database_id": "5b5186b8-246b-46cc-9f13-a54091cb8576",
+      "migrations_dir": "migrations"
     }
   ],
   "routes": [
+    {
+      "pattern": "regimealpha.chenzixin.uk/data/regimes.json",
+      "zone_name": "chenzixin.uk"
+    },
+    {
+      "pattern": "regimealpha.chenzixin.uk/data/local-preview-candles.json",
+      "zone_name": "chenzixin.uk"
+    },
+    {
+      "pattern": "regimealpha.chenzixin.uk/api/regimes*",
+      "zone_name": "chenzixin.uk"
+    },
+    {
+      "pattern": "regimealpha.chenzixin.uk/api/assets/*",
+      "zone_name": "chenzixin.uk"
+    },
     {
       "pattern": "regimealpha.chenzixin.uk/api/regime-update/*",
       "zone_name": "chenzixin.uk"
