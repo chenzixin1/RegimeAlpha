@@ -1,3 +1,5 @@
+
+
 # RegimeAlpha
 
 周度美股 regime 标注网页，基于用户提供的 PDF 策略框架、Massive 美股行情和 FMP 全球指数/跨资产数据生成。技术栈采用 Next.js App Router，生产站点固定部署到 Cloudflare Pages 自定义域：`https://regimealpha.chenzixin.uk/`。
@@ -131,6 +133,7 @@ npm run deploy:mcp
 GitHub Secrets 需要配置：
 
 - `MASSIVE_API_KEY`：Massive 数据密钥。
+- `FMP_API_KEY`：FMP 数据密钥。
 - `CLOUDFLARE_ACCOUNT_ID`：Cloudflare account ID。
 - `CLOUDFLARE_API_TOKEN`：有 Cloudflare Pages 写权限的 API token。
 
