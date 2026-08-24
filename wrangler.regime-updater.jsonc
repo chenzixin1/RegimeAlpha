@@ -28,11 +28,11 @@
   ],
   "routes": [
     {
-      "pattern": "regimealpha.chenzixin.uk/data/regimes.json",
+      "pattern": "regimealpha.chenzixin.uk/data/regimes.json*",
       "zone_name": "chenzixin.uk"
     },
     {
-      "pattern": "regimealpha.chenzixin.uk/data/local-preview-candles.json",
+      "pattern": "regimealpha.chenzixin.uk/data/local-preview-candles.json*",
       "zone_name": "chenzixin.uk"
     },
     {
