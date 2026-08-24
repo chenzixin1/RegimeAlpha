@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 
 const COLORS = {
   bull_quiet: "#2e9d68",
@@ -266,7 +266,6 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
   useEffect(() => {
     if (previewConfig?.disableDataRefresh) return undefined;
 
-    let cancelled = false;
     async function loadWorkerData() {
       try {
         const dataUrl = previewConfig?.refreshDataUrl || "/data/regimes.json";
@@ -274,41 +273,38 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
         const response = await fetch(`${dataUrl}${separator}ts=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) return;
         const nextData = await response.json();
-        if (!cancelled && nextData?.summary?.latest?.weekEnd) {
-          setData(nextData);
+        if (nextData?.summary?.latest?.weekEnd) {
+          startTransition(() => setData(nextData));
         }
-      } catch {
+      } catch (error) {
+        console.warn("Live regime data refresh failed.", error);
         // Keep static build-time data when the deployed JSON route is unavailable.
       }
     }
     loadWorkerData();
-    return () => {
-      cancelled = true;
-    };
+    return undefined;
   }, [previewConfig?.disableDataRefresh, previewConfig?.refreshDataUrl]);
 
   useEffect(() => {
     if (!previewConfig?.candleDataUrl) return undefined;
 
-    let cancelled = false;
     async function loadPreviewCandles() {
       try {
         const separator = previewConfig.candleDataUrl.includes("?") ? "&" : "?";
         const response = await fetch(`${previewConfig.candleDataUrl}${separator}ts=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) return;
         const nextData = await response.json();
-        if (!cancelled && nextData?.weekEnd && nextData?.candles) {
-          setPreviewCandles(nextData);
+        if (nextData?.weekEnd && nextData?.candles) {
+          startTransition(() => setPreviewCandles(nextData));
         }
-      } catch {
+      } catch (error) {
+        console.warn("Live preview candle refresh failed.", error);
         // Keep preview card layout even if the local candle API is unavailable.
       }
     }
 
     loadPreviewCandles();
-    return () => {
-      cancelled = true;
-    };
+    return undefined;
   }, [previewConfig?.candleDataUrl]);
 
   const rows = data.regimes;
