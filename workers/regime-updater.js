@@ -11,6 +11,8 @@ const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*"
 };
+const PRIMARY_CRON = "15 0 * * SAT";
+const RETRY_CRON = "15 3 * * SAT";
 
 export default {
   async fetch(request, env, ctx) {
@@ -39,7 +41,7 @@ export default {
     return json({
       service: "regimealpha-data",
       storage: "Cloudflare D1",
-      schedule: "Saturday 00:15 UTC (08:15 Asia/Shanghai)",
+      schedules: [PRIMARY_CRON, RETRY_CRON],
       endpoints: [
         "/data/regimes.json",
         "/api/regimes/latest",
@@ -51,7 +53,8 @@ export default {
   },
 
   async scheduled(controller, env) {
-    await runWorkerRefresh(env, `weekly-cron:${controller.cron}`);
+    const result = await runWorkerRefresh(env, `weekly-cron:${controller.cron}`);
+    if (!result.ok) throw new Error(`Scheduled regime refresh failed: ${result.error || "unknown error"}`);
   }
 };
 
@@ -184,7 +187,8 @@ async function serveStatus(db, request, env) {
   return json({
     ok: Boolean(snapshot),
     scheduler: "cloudflare-worker-cron",
-    schedule: "15 0 * * SAT",
+    schedule: PRIMARY_CRON,
+    retrySchedule: RETRY_CRON,
     active: snapshot ? {
       snapshotId: snapshot.id,
       dataThrough: snapshot.data_through,

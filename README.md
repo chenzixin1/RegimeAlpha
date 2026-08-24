@@ -33,7 +33,7 @@ MASSIVE_API_KEY="your_massive_key" FMP_API_KEY="your_fmp_key" npm run update:dat
 
 ## Cloudflare Worker 自动更新
 
-正式站点由 `regimealpha-updater` Worker 在每周六北京时间 08:15 直接运行增量刷新。Worker 读取当前 D1 快照，拉取最近一段 Massive/FMP 历史行情，在内存中重算尾部窗口，并把版本化、规范化的数据写回 D1。周五休市时生成器会自然使用当周最后一个美股交易日。
+正式站点由 `regimealpha-updater` Worker 在每周六北京时间 08:15 直接运行增量刷新，并在 11:15 自动重试一次。Worker 读取当前 D1 快照，拉取最近一段 Massive/FMP 历史行情，在内存中重算尾部窗口，并把版本化、规范化的数据写回 D1。周五休市时生成器会自然使用当周最后一个美股交易日。
 
 `active_snapshot` 只在所有数据行写入完成后切换，前端不会读到半成品。Worker 从 D1 提供 `/data/regimes.json`、预览蜡烛和按市场/资产查询的 API；Pages 内置 JSON 只作为首次部署种子和静态回退。完整设计见 [`docs/data-architecture.md`](docs/data-architecture.md)。
 

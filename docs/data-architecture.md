@@ -4,14 +4,14 @@ RegimeAlpha market data is persisted in Cloudflare D1 and refreshed without a lo
 
 ## Production flow
 
-1. Cloudflare Cron runs at `15 0 * * SAT`, which is Saturday 08:15 in Asia/Shanghai.
+1. Cloudflare Cron runs at `15 0 * * SAT`, which is Saturday 08:15 in Asia/Shanghai. A second `15 3 * * SAT` run retries the same bounded refresh three hours later so a transient provider or network failure does not leave the site stale for a week.
 2. The `regimealpha-updater` Worker reads only active snapshot metadata and fetches the incremental Massive/FMP window.
 3. The same regime engine used by the local CLI runs as a filesystem-free Worker function.
 4. D1 copies the unchanged historical prefix with `INSERT ... SELECT`; the Worker writes only the recalculated tail in bounded batches and streams compatibility JSON into bounded chunks.
 5. The Worker switches `active_snapshot` only after all normalized rows and JSON chunks are present.
 6. The website reads `/data/regimes.json` from the Worker. The static file in the Pages build remains an initial client-side fallback.
 
-The fixed Saturday schedule naturally handles US market holidays: the generator uses the latest available trading day, so a Thursday close becomes that week's `dataThrough` when Friday is closed.
+The fixed Saturday schedules naturally handle US market holidays: the generator uses the latest available trading day, so a Thursday close becomes that week's `dataThrough` when Friday is closed. Scheduled failures are rethrown after being recorded in D1 so Cloudflare Cron Events also reports the invocation as failed.
 
 All Massive REST traffic uses `https://api.massiveprivateserver.site`. Provider keys are Worker secrets, and plaintext HTTP is rejected so credentials are not exposed in transit.
 
