@@ -16,7 +16,7 @@
     "MASSIVE_BASE_URL": "https://api.massiveprivateserver.site"
   },
   "triggers": {
-    "crons": ["15 0 * * 6"]
+    "crons": ["15 0 * * SAT"]
   },
   "d1_databases": [
     {

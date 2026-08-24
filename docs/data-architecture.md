@@ -4,7 +4,7 @@ RegimeAlpha market data is persisted in Cloudflare D1 and refreshed without a lo
 
 ## Production flow
 
-1. Cloudflare Cron runs at `15 0 * * 6`, which is Saturday 08:15 in Asia/Shanghai.
+1. Cloudflare Cron runs at `15 0 * * SAT`, which is Saturday 08:15 in Asia/Shanghai.
 2. The `regimealpha-updater` Worker reads only active snapshot metadata and fetches the incremental Massive/FMP window.
 3. The same regime engine used by the local CLI runs as a filesystem-free Worker function.
 4. D1 copies the unchanged historical prefix with `INSERT ... SELECT`; the Worker writes only the recalculated tail in bounded batches and streams compatibility JSON into bounded chunks.

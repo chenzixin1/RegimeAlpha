@@ -184,7 +184,7 @@ async function serveStatus(db, request, env) {
   return json({
     ok: Boolean(snapshot),
     scheduler: "cloudflare-worker-cron",
-    schedule: "15 0 * * 6",
+    schedule: "15 0 * * SAT",
     active: snapshot ? {
       snapshotId: snapshot.id,
       dataThrough: snapshot.data_through,
