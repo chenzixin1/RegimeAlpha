@@ -29,7 +29,7 @@ function createServer(env) {
     "Get the latest RegimeAlpha market regime and latest sector/industry/custom asset snapshots.",
     {
       includeAssets: z.boolean().default(true).describe("Whether to include latest asset cards."),
-      assetLimit: z.number().int().min(1).max(50).default(30).describe("Maximum latest assets to include.")
+      assetLimit: z.number().int().min(1).max(50).default(32).describe("Maximum latest assets to include.")
     },
     async ({ includeAssets, assetLimit }) => {
       const data = await loadRegimeData(env);
@@ -46,7 +46,7 @@ function createServer(env) {
 
   server.tool(
     "get_asset_regime",
-    "Get regime details for one asset/proxy such as SPY, QQQ, SOX, SOXX, DRAM, BTC, SMH, IGV, XLK, XLE, etc.",
+    "Get regime details for one asset/proxy such as SPY, QQQ, NDX, SOX, SOXX, DRAM, BTC, SMH, IGV, XLK, XLE, etc.",
     {
       symbol: z.string().describe("Asset symbol or display symbol. Examples: SPY, SOX, SOXX, DRAM, BTC."),
       weekEnd: z.string().optional().describe("Optional week end date in YYYY-MM-DD. Defaults to latest available."),

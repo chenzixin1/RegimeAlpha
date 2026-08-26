@@ -58,6 +58,7 @@ function normalizeSymbol(symbol) {
   const value = String(symbol || "").trim().toUpperCase();
   if (value === "SOX") return "SOXX";
   if (value === "BTC") return "BTCUSD";
+  if (value === "NDX") return "^NDX";
   return value;
 }
 

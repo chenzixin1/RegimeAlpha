@@ -21,14 +21,14 @@ MASSIVE_API_KEY="your_massive_key" FMP_API_KEY="your_fmp_key" npm run update:dat
 
 ## 数据口径
 
-- 标的代理：`SPY` 代表美股大盘，`^VIX` 代表隐含波动，`TLT` 代表长久期债券，`QQQ`/`IWM`/行业 ETF 用于趋势、广度和相关性近似；`EWY`、`^KS11`、`^N225` 用于韩国 ETF、KOSPI 和日经指数观察。
+- 标的代理：`SPY` 代表美股大盘，`^VIX` 代表隐含波动，`TLT` 代表长久期债券，`QQQ`/`IWM`/行业 ETF 用于趋势、广度和相关性近似；`^NDX` 是与 `QQQ` 并存的 Nasdaq 100 指数本身；`EWY`、`^KS11`、`^N225` 用于韩国 ETF、KOSPI 和日经指数观察。
 - 频率：日线聚合为周线，输出过去五年每个有交易数据的星期。
 - 模型：规则型 regime classifier，使用 PDF 中的方向漂移、实现波动、相关性、VIX、股债相关和微观结构冲击等维度。
 - 行业分化：市场 regime 仍以 `SPY` 标注；sector/industry proxy 会单独标注自己的 regime，使用各自收益、波动、趋势效率、相对 SPY 强弱、回撤和相关性。`SOX` 使用流动性更好的 `SOXX` 作为半导体代理。
 - 自选板块：存储板块使用 `DRAM` ETF 作为跟踪代理；BTC 使用 `BTCUSD` 作为跟踪代理。
 - 缓存：本地优先使用 `.cache/regime-alpha.sqlite` 缓存 Massive 原始响应和周度 regime 结果；`REGIME_REFRESH=1` 可跳过缓存重拉。
 - 前端数据：脚本同时输出 `data/regimes.json` 和 `public/data/regimes.json`，页面不直接调用 Massive。
-- 数据源：Massive 优先提供美股/ETF 行情；FMP 提供 VIX、KOSPI、日经等指数，并在 Massive 缺失时回退。
+- 数据源：Massive 优先提供美股/ETF 行情；FMP 提供 VIX、Nasdaq 100（`^NDX`）、KOSPI、日经等指数，并在 Massive 缺失时回退。
 - 密钥：脚本从 `MASSIVE_API_KEY` 和 `FMP_API_KEY` 环境变量读取，前端源码不包含 API key。Massive REST 固定使用加密的私有代理 origin，拒绝明文 HTTP 和其他主机。
 
 ## Cloudflare Worker 自动更新
