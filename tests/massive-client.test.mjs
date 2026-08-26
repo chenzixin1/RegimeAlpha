@@ -11,6 +11,7 @@ test("pins Massive requests to the encrypted private proxy", () => {
 
 test("maps exceptional symbols", () => {
   assert.equal(toMassiveSymbol("^VIX"), "I:VIX");
+  assert.equal(toMassiveSymbol("^NDX"), "I:NDX");
   assert.equal(toMassiveSymbol("BTCUSD"), "X:BTCUSD");
   assert.equal(toMassiveSymbol("SPY"), "SPY");
 });

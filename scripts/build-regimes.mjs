@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { fetchMassiveAggregates, normalizeMassiveBars, toMassiveSymbol } from "../lib/massive-client.js";
 import { fetchFmpDaily } from "../lib/fmp-client.js";
 
-const FMP_PRIMARY_SYMBOLS = new Set(["^VIX", "^KS11", "^N225"]);
+export const FMP_PRIMARY_SYMBOLS = new Set(["^VIX", "^KS11", "^N225", "^NDX"]);
 const DAY = 24 * 60 * 60 * 1000;
 let MASSIVE_CONFIG;
 let FMP_CONFIG;
@@ -93,13 +93,14 @@ export function loadLocalEnv(paths) {
 const ASSET_PROXIES = [
   { symbol: "SPY", displaySymbol: "SPY", name: "S&P 500", group: "Market" },
   { symbol: "QQQ", displaySymbol: "QQQ", name: "Nasdaq 100", group: "Style" },
+  { symbol: "^NDX", displaySymbol: "NDX", name: "Nasdaq 100 Index", group: "Style", proxyNote: "FMP ^NDX is used as the Nasdaq 100 index." },
   { symbol: "IWM", displaySymbol: "IWM", name: "Russell 2000", group: "Style" },
   ...BROAD_SECTOR_PROXIES,
   ...INDUSTRY_PROXIES,
   ...INTERNATIONAL_PROXIES
 ];
 const SECTOR_SYMBOLS = BROAD_SECTOR_PROXIES.map((proxy) => proxy.symbol);
-const SYMBOLS = [...new Set([...PRIMARY_SYMBOLS, ...ASSET_PROXIES.map((proxy) => proxy.symbol)])];
+export const SYMBOLS = [...new Set([...PRIMARY_SYMBOLS, ...ASSET_PROXIES.map((proxy) => proxy.symbol)])];
 
 const REGIMES = {
   bull_quiet: {

@@ -4,11 +4,15 @@ import { generateRegimeData } from "../scripts/build-regimes.mjs";
 
 test("runs full and incremental regime generation without filesystem state", async () => {
   const originalFetch = globalThis.fetch;
+  const fmpSymbols = new Set();
+  const massiveSymbols = new Set();
   globalThis.fetch = async (input) => {
     const url = new URL(input);
     const symbol = url.hostname === "fmp.test"
       ? url.searchParams.get("symbol")
       : decodeURIComponent(url.pathname.split("/ticker/")[1].split("/range/")[0]);
+    if (url.hostname === "fmp.test") fmpSymbols.add(symbol);
+    else massiveSymbols.add(symbol);
     let bars = dailyBars(symbol);
     if (url.hostname === "fmp.test") {
       const from = url.searchParams.get("from");
@@ -63,7 +67,23 @@ test("runs full and incremental regime generation without filesystem state", asy
     assert.equal(updated.payload.metadata.dataThrough, "2026-08-18");
     assert.equal(updated.payload.summary.latest.weekEnd, "2026-08-18");
     assert.equal(updated.assetWeekCandles.weekEnd, "2026-08-18");
-    assert.equal(updated.payload.assetRegimes.length, 30);
+    assert.equal(updated.payload.assetRegimes.length, 31);
+    assert.equal(initial.payload.metadata.primaryProxy, "SPY");
+    assert.ok(initial.payload.metadata.symbols.includes("QQQ"));
+    assert.ok(initial.payload.metadata.symbols.includes("^NDX"));
+    const ndx = initial.payload.assetRegimes.find((asset) => asset.symbol === "^NDX");
+    const qqq = initial.payload.assetRegimes.find((asset) => asset.symbol === "QQQ");
+    assert.ok(qqq, "QQQ ETF proxy should remain");
+    assert.equal(qqq.group, "Style");
+    assert.ok(ndx, "^NDX should be classified as its own asset");
+    assert.equal(ndx.displaySymbol, "NDX");
+    assert.equal(ndx.group, "Style");
+    assert.ok(ndx.regimes.length > 0);
+    assert.ok(updated.assetWeekCandles.candles.QQQ);
+    assert.ok(updated.assetWeekCandles.candles["^NDX"]);
+    assert.ok(fmpSymbols.has("^NDX"));
+    assert.equal(massiveSymbols.has("^NDX"), false);
+    assert.equal(massiveSymbols.has("I:NDX"), false);
     assert.ok(updated.payload.regimes.length < initial.payload.regimes.length);
   } finally {
     globalThis.fetch = originalFetch;
