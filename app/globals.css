@@ -90,6 +90,65 @@ h1 {
   font-size: 1.1rem;
 }
 
+.sync-shell {
+  margin: 0 auto;
+  max-width: 1500px;
+}
+
+.sync-panel {
+  align-content: center;
+  background:
+    radial-gradient(circle at 78% 28%, rgba(24, 114, 79, 0.12), transparent 24%),
+    linear-gradient(135deg, color-mix(in oklch, var(--paper) 96%, white), #edf2e9);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  justify-items: start;
+  min-height: 280px;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 64px);
+  position: relative;
+}
+
+.sync-panel h2 {
+  font-size: clamp(1.5rem, 3vw, 2.6rem);
+  margin-bottom: 10px;
+}
+
+.sync-panel > p:last-child {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 560px;
+}
+
+.sync-pulse {
+  background: var(--good);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(24, 114, 79, 0.35);
+  height: 10px;
+  margin-bottom: 24px;
+  width: 10px;
+  animation: sync-pulse 1.8s ease-out infinite;
+}
+
+@keyframes sync-pulse {
+  70% {
+    box-shadow: 0 0 0 12px rgba(24, 114, 79, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(24, 114, 79, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-pulse {
+    animation: none;
+  }
+}
+
 .dashboard {
   display: grid;
   gap: 16px;

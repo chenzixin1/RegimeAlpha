@@ -239,6 +239,7 @@ const ASSET_SORT_OPTIONS = [
 
 export default function RegimeDashboard({ initialData, previewConfig = null, initialPreviewCandles = null, industryVariant = null }) {
   const [data, setData] = useState(initialData);
+  const [dataRefreshState, setDataRefreshState] = useState(previewConfig?.disableDataRefresh ? "ready" : "loading");
   const [previewCandles, setPreviewCandles] = useState(initialPreviewCandles);
   const [selectedWeek, setSelectedWeek] = useState(initialData.summary.latest.weekEnd);
   const [selectedAssetSymbol, setSelectedAssetSymbol] = useState("SOXX");
@@ -265,24 +266,31 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
 
   useEffect(() => {
     if (previewConfig?.disableDataRefresh) return undefined;
+    const controller = new AbortController();
 
     async function loadWorkerData() {
       try {
         const dataUrl = previewConfig?.refreshDataUrl || "/data/regimes.json";
         const separator = dataUrl.includes("?") ? "&" : "?";
-        const response = await fetch(`${dataUrl}${separator}ts=${Date.now()}`, { cache: "no-store" });
-        if (!response.ok) return;
+        const response = await fetch(`${dataUrl}${separator}ts=${Date.now()}`, {
+          cache: "no-store",
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`Live regime data returned ${response.status}.`);
         const nextData = await response.json();
-        if (nextData?.summary?.latest?.weekEnd) {
-          startTransition(() => setData(nextData));
-        }
+        if (!nextData?.summary?.latest?.weekEnd) throw new Error("Live regime data is incomplete.");
+        startTransition(() => {
+          setData(nextData);
+          setDataRefreshState("ready");
+        });
       } catch (error) {
+        if (error.name === "AbortError") return;
         console.warn("Live regime data refresh failed.", error);
-        // Keep static build-time data when the deployed JSON route is unavailable.
+        setDataRefreshState("fallback");
       }
     }
     loadWorkerData();
-    return undefined;
+    return () => controller.abort();
   }, [previewConfig?.disableDataRefresh, previewConfig?.refreshDataUrl]);
 
   useEffect(() => {
@@ -488,13 +496,36 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
           {industryVariant ? <IndustryVariantNav activeVariant={industryVariant} /> : null}
         </div>
         <div className="freshness">
-          <span>数据截至</span>
-          <strong>{data.metadata.dataThrough}</strong>
-          <span>生成于 {formatDateTime(data.metadata.generatedAt)}</span>
+          {dataRefreshState === "loading" ? (
+            <>
+              <span>线上数据</span>
+              <strong>同步中</strong>
+              <span>正在读取 D1 最新快照</span>
+            </>
+          ) : (
+            <>
+              <span>{dataRefreshState === "fallback" ? "静态回退" : "数据截至"}</span>
+              <strong>{data.metadata.dataThrough}</strong>
+              <span>
+                {dataRefreshState === "fallback" ? "线上数据暂不可用 · " : ""}
+                生成于 {formatDateTime(data.metadata.generatedAt)}
+              </span>
+            </>
+          )}
         </div>
       </header>
 
-      <main className="dashboard">
+      {dataRefreshState === "loading" ? (
+        <main className="sync-shell" aria-live="polite">
+          <section className="sync-panel">
+            <span className="sync-pulse" aria-hidden="true" />
+            <p className="eyebrow">Cloudflare D1 / Live Snapshot</p>
+            <h2>正在同步本周 Regime 数据</h2>
+            <p>页面正在读取云端最新快照，旧的构建数据不会作为当前结果展示。</p>
+          </section>
+        </main>
+      ) : (
+        <main className="dashboard">
         <WeeklySummary summary={weeklyChange} charts={weeklyCharts} latest={latest} previous={previous} />
 
         <section className="source-panel">
@@ -902,7 +933,8 @@ export default function RegimeDashboard({ initialData, previewConfig = null, ini
             ))}
           </div>
         </section>
-      </main>
+        </main>
+      )}
       <button type="button" className="chat-launcher" onClick={() => setChatOpen((value) => !value)}>
         研究助手
       </button>
