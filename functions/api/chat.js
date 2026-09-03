@@ -1,4 +1,5 @@
 import { ARTICLE_CHUNKS, ARTICLE_PDF_PATH, ARTICLE_TITLE } from "../_data/articleContext.js";
+import { loadRegimeDataFromService } from "../../lib/regime-data-source.js";
 
 const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const FALLBACK_MODELS = ["openrouter/auto", "google/gemini-3.5-flash"];
@@ -22,7 +23,7 @@ export async function onRequestPost({ request, env }) {
     return json({ error: "Missing question." }, 400);
   }
 
-  const marketData = await loadMarketData(request);
+  const marketData = await loadMarketData(request, env);
   const relevantSymbols = detectRelevantSymbols(question, body.context || {});
   const articleContext = selectArticleContext(question, messages, relevantSymbols);
   const marketContext = buildMarketContext(marketData, body.context || {}, relevantSymbols);
@@ -165,13 +166,13 @@ function isIncompleteAnswer(answer) {
   return /[（(：:，,、]$/.test(text);
 }
 
-async function loadMarketData(request) {
-  const url = new URL("/data/regimes.json", request.url);
-  const response = await fetch(url.toString(), {
-    cf: { cacheTtl: 60, cacheEverything: false }
-  });
-  if (!response.ok) return null;
-  return response.json();
+async function loadMarketData(request, env) {
+  try {
+    return await loadRegimeDataFromService(env, request.url);
+  } catch (error) {
+    console.warn("Current regime data is unavailable to the research assistant.", error);
+    return null;
+  }
 }
 
 function buildMarketContext(data, uiContext, relevantSymbols = []) {

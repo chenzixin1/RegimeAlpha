@@ -1,8 +1,8 @@
-const DATA_PATH = "/data/regimes.json";
+import { loadRegimeDataFromService } from "../../lib/regime-data-source.js";
 
-export async function onRequestGet({ request }) {
+export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
-  const data = await loadRegimeData(request);
+  const data = await loadRegimeDataFromService(env, request.url);
   const symbol = url.searchParams.get("symbol");
   const weekEnd = url.searchParams.get("weekEnd");
   const limit = clampInt(url.searchParams.get("limit"), 1, 104, 12);
@@ -34,17 +34,6 @@ export async function onRequestGet({ request }) {
     recentWeeks: data.regimes.slice(-limit).map(compactMarketRow),
     links: publicLinks(url.origin)
   });
-}
-
-async function loadRegimeData(request) {
-  const response = await fetch(new URL(DATA_PATH, request.url), {
-    headers: { accept: "application/json" },
-    cf: { cacheTtl: 120, cacheEverything: true }
-  });
-  if (!response.ok) {
-    throw new Error(`RegimeAlpha data fetch failed: ${response.status}`);
-  }
-  return response.json();
 }
 
 function findAssetSeries(data, symbol) {
@@ -208,10 +197,14 @@ function clampInt(value, min, max, fallback) {
 }
 
 function json(payload, status = 200) {
+  const headers = {
+    "cache-control": "public, max-age=120, stale-while-revalidate=3600"
+  };
+  if (payload?.metadata?.dataThrough) {
+    headers["x-regime-data-through"] = payload.metadata.dataThrough;
+  }
   return Response.json(payload, {
     status,
-    headers: {
-      "cache-control": "public, max-age=120, stale-while-revalidate=3600"
-    }
+    headers
   });
 }

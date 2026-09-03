@@ -1,15 +1,10 @@
+import { loadRegimeDataFromService } from "../lib/regime-data-source.js";
+
 export const DEFAULT_DATA_URL = "https://regimealpha.chenzixin.uk/data/regimes.json";
 export const DEFAULT_APP_URL = "https://regimealpha.chenzixin.uk";
 
 export async function loadRegimeData(env) {
-  const response = await fetch(env.REGIME_DATA_URL || DEFAULT_DATA_URL, {
-    headers: { accept: "application/json" },
-    cf: { cacheTtl: 120, cacheEverything: true }
-  });
-  if (!response.ok) {
-    throw new Error(`RegimeAlpha data fetch failed: ${response.status}`);
-  }
-  return response.json();
+  return loadRegimeDataFromService(env, env.REGIME_DATA_URL || DEFAULT_DATA_URL);
 }
 
 export function latestAssets(data) {

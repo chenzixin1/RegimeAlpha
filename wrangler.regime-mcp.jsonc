@@ -6,9 +6,14 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "vars": {
-    "REGIME_APP_URL": "https://regimealpha.chenzixin.uk",
-    "REGIME_DATA_URL": "https://regimealpha.chenzixin.uk/data/regimes.json"
+    "REGIME_APP_URL": "https://regimealpha.chenzixin.uk"
   },
+  "services": [
+    {
+      "binding": "REGIME_DATA_SERVICE",
+      "service": "regimealpha-updater"
+    }
+  ],
   "routes": [
     {
       "pattern": "regimealpha.chenzixin.uk/mcp*",
